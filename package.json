@@ -1,0 +1,35 @@
+{
+  "name": "ai-crm",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @ai-crm/api --filter @ai-crm/web --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @ai-crm/api db:generate",
+    "db:migrate": "pnpm --filter @ai-crm/api db:migrate",
+    "db:deploy": "pnpm --filter @ai-crm/api db:deploy",
+    "db:seed": "pnpm --filter @ai-crm/api db:seed",
+    "db:studio": "pnpm --filter @ai-crm/api db:studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@next/eslint-plugin-next": "16.3.5",
+    "@types/node": "22.20.2",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.0"
+  }
+}
