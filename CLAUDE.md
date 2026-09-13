@@ -2,7 +2,7 @@
 
 คู่มือสำหรับ Claude Code ในโปรเจกต์ **ai-crm** — อ่านให้ครบก่อนเริ่มงานทุกครั้ง
 
-> **สถานะปัจจุบัน:** Phase 1 (foundation) + Phase 2 (auth + CRM API 23 endpoints) เสร็จ — ถัดไป Phase 3 (web UI + deploy)
+> **สถานะปัจจุบัน:** Phase 1–3 เสร็จ (foundation, auth + CRM API, web UI + ไฟล์ deploy) — ขั้นตอน deploy บน Railway ต้องใช้บัญชีผู้ใช้ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ถัดไป Phase 4 (AI Copilot)
 > แผน: [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) · โจทย์: [docs/assignment.pdf](docs/assignment.pdf) (หน้า 1–3 JD, หน้า 4–5 โจทย์)
 
 ## คำสั่งที่ใช้บ่อย (รันที่ root)
@@ -17,10 +17,23 @@ pnpm db:seed        # ข้อมูลสังเคราะห์ — DB �
 pnpm dev            # web http://localhost:3000 + api http://localhost:4000
 pnpm test           # vitest (packages/shared + apps/api กับ DB ai_crm_test)
 pnpm lint && pnpm typecheck && pnpm build
+
+# production image ทั้งชุดในเครื่อง (จำลอง Railway) — web ที่ http://localhost:3100
+JWT_SECRET=$(openssl rand -base64 48) docker compose -f docker-compose.prod.yml up --build
 ```
 
 env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `apps/web/.env.example` → `apps/web/.env.local`
 ลองเรียก API ด้วยมือ: [apps/api/requests.http](apps/api/requests.http) (VS Code REST Client — อ่านรหัสผ่านจาก `.env`)
+
+## แนวทางเขียนเว็บ (ใช้ตั้งแต่ Phase 3)
+
+- อ่านเอกสาร Next.js 16 ใน `node_modules/next/dist/docs/` ก่อนเขียน — เช่น `middleware.ts` เปลี่ยนเป็น `src/proxy.ts`, `params` ของ page เป็น Promise (`PageProps<'/leads/[id]'>`)
+- เรียก API ผ่าน `api` ใน `apps/web/src/lib/endpoints.ts` เท่านั้น — response ทุกตัวถูก parse ด้วย schema ของ shared (ไม่เชื่อข้อมูลจาก network)
+- ฟอร์ม: validate ด้วย schema ของ shared (`validate()` ใน `lib/form.ts`) ก่อนส่ง และแสดง `issues` จาก API ใต้ field ด้วย path เดียวกัน — ข้อความ error ของ zod เป็นภาษาไทย (`z.config(th())`)
+- ข้อมูลฝั่ง client ใช้ TanStack Query (`lib/queries.ts`); หลังแก้ lead เรียก `useInvalidateLeads()`; 401 ทุกที่ถูกพาไปหน้า login พร้อม `?next=` (ตรวจด้วย `safeNextPath` กัน open redirect)
+- filter ของหน้ารายการเก็บใน URL (refresh / แชร์ลิงก์ได้); หน้าที่ใช้ `useSearchParams` ต้องห่อด้วย `<Suspense>`
+- UI component เขียนเองบน element ของ browser (`<dialog>`, `<select>`) ใน `components/ui.tsx` — ไม่มี tailwind-merge จึงห้าม override ขนาด/ความกว้างด้วย className ให้เพิ่ม prop (เช่น `compact`) แทน
+- ตรวจ UI ใน browser จริงก่อนบอกว่าเสร็จ (Phase 3 ใช้ `playwright-core` + Chrome ในเครื่อง — ดู log #6)
 
 ## แนวทางเขียน API (ใช้ตั้งแต่ Phase 2)
 

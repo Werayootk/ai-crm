@@ -2,7 +2,7 @@
 
 AI CRM MVP สำหรับทีมขาย 20 คน (~2,000 contacts, 300 active leads) — website + API + Postgres + AI CRM skill + LINE OA
 
-> อยู่ระหว่างพัฒนา: Phase 1 (foundation) และ Phase 2 (auth + CRM API) เสร็จแล้ว — ดูแผนและลำดับงานที่ [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md)
+> อยู่ระหว่างพัฒนา: Phase 1–3 เสร็จแล้ว (foundation, auth + CRM API, web UI + ไฟล์ deploy) — ดูแผนและลำดับงานที่ [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md)
 > README ฉบับเต็ม (architecture, API notes, deploy, trade-offs) จะเขียนใน Phase 6
 
 ## Stack
@@ -25,11 +25,16 @@ pnpm db:seed        # ข้อมูลสังเคราะห์ทั้�
 pnpm dev            # web http://localhost:3000 · api http://localhost:4000
 ```
 
-เปิด http://localhost:3000 จะเห็นสถานะ API / Database
+เปิด http://localhost:3000 → login ด้วยบัญชี demo ที่ seed สร้าง: `admin@demo.local`, `sales01@demo.local` … `sales19@demo.local` — รหัสผ่านคือค่า `SEED_DEMO_PASSWORD`
 
-บัญชี demo ที่ seed สร้าง: `admin@demo.local`, `sales01@demo.local` … `sales19@demo.local` — รหัสผ่านคือค่า `SEED_DEMO_PASSWORD` (หน้า login มาใน Phase 3)
+หน้าที่มี: Leads (ค้นหา / กรอง / เรียง), Pipeline (board ตาม stage), รายละเอียด lead (ย้าย stage, timeline, บันทึกกิจกรรม), Contacts, Companies — ใช้ได้ทั้งจอกว้างและมือถือ
 
-API (Phase 2) ลองเรียกได้จาก [apps/api/requests.http](apps/api/requests.http) ด้วย VS Code extension "REST Client"
+API ลองเรียกได้จาก [apps/api/requests.http](apps/api/requests.http) ด้วย VS Code extension "REST Client"
+
+## Deploy
+
+- Railway (Postgres + api + web): [docs/deploy-railway.md](docs/deploy-railway.md)
+- ลอง production image ชุดเดียวกันในเครื่อง: `JWT_SECRET=$(openssl rand -base64 48) docker compose -f docker-compose.prod.yml up --build` → http://localhost:3100
 
 ## ตรวจคุณภาพ
 

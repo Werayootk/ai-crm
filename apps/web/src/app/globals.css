@@ -1,39 +1,21 @@
+@import 'tailwindcss';
+
+@theme {
+  /* ฟอนต์ของระบบที่รองรับภาษาไทย — ไม่โหลดฟอนต์จากภายนอกตอน build */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Noto Sans Thai', 'Leelawadee UI',
+    Thonburi, sans-serif;
+}
+
 :root {
-  color-scheme: light dark;
-  --bg: #f7f7f5;
-  --fg: #1c1c1a;
-  --muted: #6b6b66;
-  --card: #ffffff;
-  --border: #e2e2dd;
-  --ok: #1f7a4d;
-  --bad: #b3261e;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161615;
-    --fg: #ececea;
-    --muted: #9b9b96;
-    --card: #1f1f1d;
-    --border: #33332f;
-    --ok: #5cc28e;
-    --bad: #f2837b;
-  }
-}
-
-* {
-  box-sizing: border-box;
+  color-scheme: light;
 }
 
 body {
-  margin: 0;
-  padding-inline: 16px;
-  background: var(--bg);
-  color: var(--fg);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
-  line-height: 1.5;
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* <dialog> ของ browser — ใช้แทน modal library */
+dialog::backdrop {
+  background: rgb(15 23 42 / 0.45);
 }

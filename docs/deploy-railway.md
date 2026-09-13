@@ -1,0 +1,71 @@
+# Deploy บน Railway
+
+> ขั้นตอนในหน้านี้ต้องใช้บัญชี Railway และ GitHub ของเจ้าของ repo — ส่วน build/deploy config อยู่ใน repo แล้ว (config as code)
+> ทดสอบ image ชุดเดียวกันในเครื่องได้ก่อนด้วย [docker-compose.prod.yml](../docker-compose.prod.yml)
+
+## ภาพรวม
+
+```mermaid
+flowchart LR
+  B[Browser] -- HTTPS --> W[web<br/>Next.js standalone]
+  W -- "/api/* rewrite<br/>private network" --> A[api<br/>Express]
+  L[LINE Platform<br/>Phase 5] -- HTTPS webhook --> A
+  A --> P[(Postgres)]
+```
+
+Railway project เดียว มี 3 service
+
+| Service | ที่มา | Config file | Public domain |
+|---|---|---|---|
+| `Postgres` | Railway database | — | ไม่ต้องเปิด |
+| `api` | repo นี้ | `/apps/api/railway.json` | เปิด (ใช้เป็น LINE webhook URL ใน Phase 5) |
+| `web` | repo นี้ | `/apps/web/railway.json` | เปิด — เป็น URL ของ demo |
+
+browser คุยกับ `web` อย่างเดียว (`/api/*` ถูก proxy ไป `api` ผ่าน private network) → session cookie เป็น first-party และไม่ต้องเปิด CORS
+
+## ขั้นตอน (ครั้งแรก)
+
+1. **Push branch ขึ้น GitHub** ให้ Railway เข้าถึง repo ได้
+2. **สร้าง project** → New Project → Deploy PostgreSQL (ตั้งชื่อ service ว่า `Postgres`)
+3. **Service `api`** → + New → GitHub Repo → เลือก repo นี้ → เปลี่ยนชื่อ service เป็น `api`
+   - Settings → Source: **Root Directory เว้นว่าง** (Dockerfile ต้องใช้ root ของ repo เป็น build context)
+   - Settings → Config-as-code → Railway Config File: `/apps/api/railway.json` (ต้องเป็น path เต็มจาก root)
+   - Variables:
+
+     | Key | Value |
+     |---|---|
+     | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+     | `JWT_SECRET` | สร้างด้วย `openssl rand -base64 48` แล้วใส่ใน Railway เท่านั้น |
+     | `PORT` | `4000` (ตายตัว เพื่อให้ `web` อ้างถึงได้) |
+     | `TRUST_PROXY` | `2` (Railway edge + Next proxy) |
+     | `SESSION_TTL_HOURS` | `8` |
+
+   - Networking → Generate Domain
+4. **Service `web`** → + New → GitHub Repo (repo เดิม) → ชื่อ `web`
+   - Root Directory เว้นว่าง, Railway Config File: `/apps/web/railway.json`
+   - Variables: `API_URL` = `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:4000`
+     (ใช้ตอน **build** — rewrite ของ Next ถูกเขียนลง output ตอน build; Dockerfile รับผ่าน `ARG API_URL`)
+   - Networking → Generate Domain → นี่คือ URL ของ demo
+5. **Deploy** — `api` รัน `preDeployCommand` (`prisma migrate deploy`) ก่อนสลับเวอร์ชันทุกครั้ง; ใน deploy log ต้องเห็น `All migrations have been successfully applied`
+6. **Seed ข้อมูล demo ครั้งเดียว** (ข้อมูลสังเคราะห์) จากเครื่อง local
+   - Postgres service → Connect → คัดลอก URL แบบ public (`DATABASE_PUBLIC_URL`)
+   - ```bash
+     DATABASE_URL='<public url>' SEED_DEMO_PASSWORD='<รหัสผ่าน demo ≥ 12 ตัว>' \
+       ALLOW_PRODUCTION_SEED=true NODE_ENV=production pnpm db:seed
+     ```
+   - seed ไม่ยอมรันกับ production ถ้าไม่มี `ALLOW_PRODUCTION_SEED=true` และไม่ยอมล้าง DB ที่มีข้อมูลแล้วถ้าไม่มี `-- --reset`
+7. **ตรวจ**
+   - `curl https://<api-domain>/api/health` → `{"status":"ok","db":"up",...}`
+   - เปิด web URL → login ด้วยบัญชี demo → ย้าย stage ของ lead → Railway: Restart ทั้ง `web` และ `api` → refresh → ข้อมูลยังอยู่
+
+## หลังจากนั้น
+
+- Railway deploy ใหม่เองเมื่อ push เข้า branch ที่ผูกไว้ — `watchPatterns` ใน `railway.json` ทำให้แก้ `apps/web` ไม่ trigger `api` (และกลับกัน)
+- เปลี่ยนชื่อ service `api` หรือ `PORT` → ต้อง redeploy `web` ด้วย (เพราะ `API_URL` อยู่ใน build)
+- secret ทั้งหมด (`JWT_SECRET`, LINE channel secret/token, `ANTHROPIC_API_KEY` ใน Phase 4–5) ใส่ใน Railway Variables เท่านั้น ห้าม commit
+
+## ข้อจำกัดที่รู้อยู่
+
+- image ของ `api` ยังใหญ่ (~960MB) เพราะเก็บ dev dependency ไว้ให้ pre-deploy ใช้ prisma CLI — next step: แยก image สำหรับ migrate
+- `TRUST_PROXY=2` ตั้งไว้สำหรับ request ที่ผ่าน `web`; request ที่ยิงตรงเข้า public domain ของ `api` ปลอม `X-Forwarded-For` ได้ แต่ rate limit ของ login ยังนับราย email อยู่
+- retry worker (Phase 5) ออกแบบให้รัน instance เดียว — อย่า scale `api` เกิน 1 replica จนกว่าจะย้ายไปใช้ queue

@@ -186,7 +186,55 @@
 
 **สิ่งที่ AI ทำ**
 
-- commit Phase 2 บน branch `phase-2-auth-crm-api` แล้วแตก branch `phase-3-web-ui-deploy` ต่อจากนั้น
+- 20:59 commit Phase 2 (`fa3ea26`) บน branch `phase-2-auth-crm-api` แล้วแตก branch `phase-3-web-ui-deploy` ต่อจากนั้น
+
+**Phase 3 — สิ่งที่ AI ทำ (21:00–21:57)**
+
+- อ่านเอกสาร Next.js 16 ใน `node_modules` ก่อนเขียน (ตามที่ `apps/web/AGENTS.md` ของ Next บอก) — พบว่า `middleware.ts` เปลี่ยนเป็น `proxy.ts`, `params` ต้อง `await`, standalone output ใน monorepo ต้องตั้ง `outputFileTracingRoot`
+- ตรวจ library ใหม่ (Tailwind 4.3, TanStack Query 5.102) ว่า publish มาเกิน 1 วัน; ติดตั้ง react-hook-form แล้ว**ถอดออก**เมื่อออกแบบให้ทุกฟอร์ม validate ด้วย schema ของ shared ตัวเดียวกับ API (พบว่า zod v4 มี locale ภาษาไทย → error ในฟอร์มเป็นภาษาไทย)
+- สร้างหน้าเว็บ: login, Leads (filter เก็บใน URL), รายละเอียด lead (ย้าย stage, Lost ต้องมีเหตุผล, timeline, เพิ่มกิจกรรม, แก้ไข), สร้าง lead, Pipeline board, Contacts, Companies — ใช้ได้บนมือถือ
+- ทดสอบ `prisma generate` โดยไม่มี `DATABASE_URL` ก่อนเขียน Dockerfile → พบว่า `env()` ของ Prisma throw → เปลี่ยนเป็น `process.env`
+- เขียน Dockerfile ของ api/web, `railway.json`, `docker-compose.prod.yml` และ [docs/deploy-railway.md](deploy-railway.md) (ตรวจ schema ของ `railway.json` จากเอกสาร Railway แทนการเดา)
+- **ตรวจใน browser จริง** (Chrome ผ่าน `playwright-core` ใน scratchpad — ไม่มี `chromium-cli`) ทั้งบน dev server และบน production container: login ผิด/ถูก, filter + refresh, validation ของฟอร์ม, สร้าง lead, ย้าย stage (รวม Lost ที่ต้องมีเหตุผลและ reopen), บันทึกกิจกรรม, pipeline, มือถือ, logout, cookie ปลอม
+- ตรวจว่าข้อมูลอยู่รอดหลัง restart ทั้ง db + api + web ใน production stack → lead, timeline และตัวเลข pipeline ตรงกันก่อน/หลัง
+- ผลการตรวจ: test 121/121 (เพิ่ม test ของ web lib 15 ตัว), lint + typecheck + build ผ่าน
+
+**สิ่งที่ตรวจเจอจาก browser จริงแล้วแก้** (test อัตโนมัติไม่จับ)
+
+- **logout แล้ว redirect ซ้อนกัน (bug จริง)** — เจอเฉพาะบน production build: `queryClient.clear()` ทำให้ query ที่ค้างอยู่ refetch แล้วได้ 401 → ตัวจัดการ 401 พาไปหน้า login พร้อมกับการ logout → เปลี่ยนเป็น hard navigation + flag กันตัวจัดการ 401 ระหว่าง logout
+- เมนูบนมือถือถูกตัด ("Contacts" เหลือ "C") และชื่อ lead ยาวถูกตัด → เมนูขึ้นแถวของตัวเองบนจอเล็ก, หัวข้อตัดบรรทัดแทน
+- ช่อง filter "ที่มา" ยืดเต็มแถว เพราะ class `w-auto` ชนกับ `w-full` → เพิ่ม prop `compact` แทนการ override ด้วย className
+- ทุกการ์ดใน pipeline สร้าง `<dialog>` ซ่อนไว้ (~100 ตัว) → mount dialog เฉพาะตอนเปิด
+- favicon หาย (404) → เพิ่ม `icon.svg` และยกเว้นใน matcher ของ proxy
+- React เตือน hydration mismatch → ตรวจแล้วเป็นผลจาก Playwright แทรก style ซ่อน caret ก่อน hydrate (ไม่ใช่ bug ของแอป) — ยืนยันโดยรันใหม่ด้วย `caret: 'initial'` แล้ว warning หายไป
+- ปุ่มบันทึกกิจกรรมแสดง "บันทึกบันทึก" และ `Button` ที่รับ `disabled={false}` ตอน loading ยังกดได้ → แก้ข้อความ และย้าย `disabled` ไปหลัง spread
+- image ของ api ใหญ่ 1.54GB → ตรวจด้วย `du` พบ pnpm store + cache ติดมา ~850MB → ใช้ BuildKit cache mount เหลือ 961MB (ที่เหลือคือ dev dependency ที่ pre-deploy ต้องใช้ — บันทึกเป็น next step)
+
+**ยังไม่ได้ทำ (ต้องใช้บัญชีของผู้ใช้)** — deploy จริงบน Railway: ต้อง push repo ขึ้น GitHub และสร้าง service ใน Railway ตาม [docs/deploy-railway.md](deploy-railway.md)
+
+**Human review** — Phase 3 รอผู้ใช้ review, ยังไม่ commit
+
+---
+
+### #7 · 22:07 — ผู้ใช้ขอให้ตอบเป็นภาษาไทย
+
+**Prompt**
+
+> ขอ response เป็นภาษาไทย
+
+**สิ่งที่ AI ทำ** — บันทึกเป็น memory ของ Claude Code (ใช้กับทุก session ถัดไป) และสรุปงาน Phase 3 ใหม่เป็นภาษาไทยที่ใช้คำอังกฤษน้อยลง
+
+---
+
+### #8 · 22:11 — commit Phase 3 และทำ Phase 4 จนจบ
+
+**Prompt**
+
+> commit Phase 3 เลย ยังไม่ต้อง Push อยากให้ทำ Phase 4 - จบ ต่อไปเพื่อให้ทดลองบน local ได้ก่อน จากนั้นเขียน step deploy เพื่อไป deploy
+
+**สิ่งที่ AI ทำ**
+
+- commit Phase 3 บน branch `phase-3-web-ui-deploy` (ไม่ push)
 
 ---
 
