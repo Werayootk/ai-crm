@@ -21,6 +21,7 @@ import { SOURCE_LABEL, STAGE_META } from '@/lib/labels';
 import { useLead } from '@/lib/queries';
 import { LeadEditDialog } from './lead-edit-dialog';
 import { AiPanel } from './ai-panel';
+import { LineComposer } from './line-composer';
 import { AddActivityForm, Timeline } from './timeline';
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -145,6 +146,7 @@ export function LeadDetailView({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <AiPanel leadId={data.id} />
+          {data.contact.line.linked ? <LineComposer leadId={data.id} /> : null}
           <AddActivityForm leadId={data.id} />
           <Timeline leadId={data.id} />
         </div>

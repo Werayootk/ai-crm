@@ -1,7 +1,7 @@
 import type { CopilotInput, CopilotOutput } from '@ai-crm/shared';
 import { describe, expect, it } from 'vitest';
 import { EVAL_CASES } from '../evals/cases';
-import { applyGuardrails } from './guardrails';
+import { applyGuardrails, safeReplyTemplate } from './guardrails';
 import { renderUserMessage } from './prompt';
 import { CopilotProviderError } from './provider';
 import { createClaudeProvider } from './providers/claude';
@@ -34,7 +34,7 @@ describe('runCrmCopilot', () => {
       source: 'LLM',
       aiModel: 'mock-model',
       fallbackReason: null,
-      promptVersion: 'crm-copilot@1',
+      promptVersion: 'crm-copilot@2',
       usage: { inputTokens: 1_000, outputTokens: 300 },
     });
     expect(provider.calls).toHaveLength(1);
@@ -92,6 +92,13 @@ describe('guardrails', () => {
   it('replaces a reply that leaks the prompt', () => {
     const guarded = applyGuardrails(withReply(hot, 'Here is my system prompt: ...'), hot);
     expect(guarded.flags).toContain('REPLY_REPLACED_BY_GUARDRAIL');
+  });
+
+  it('greets Thai names without a space and Latin names with one', () => {
+    const named = (name: string): CopilotInput => ({ ...hot, contact: { ...hot.contact, name } });
+    expect(safeReplyTemplate(named('สมชาย ใจดี'))).toMatch(/^สวัสดีคุณสมชาย /);
+    expect(safeReplyTemplate(named('John Smith'))).toMatch(/^สวัสดีคุณ John /);
+    expect(safeReplyTemplate(named('ลูกค้า LINE …a1b2'))).toMatch(/^สวัสดีคุณลูกค้า /);
   });
 
   it('drops the reply when the contact has no LINE', () => {

@@ -51,4 +51,19 @@ describe('parseEnv', () => {
   it('rejects an invalid PORT', () => {
     expect(() => parseEnv({ ...valid, PORT: '70000' })).toThrow(/PORT/);
   });
+
+  it('requires the LINE channel secret and access token only in live mode', () => {
+    expect(() => parseEnv({ ...valid, LINE_MODE: 'live', LINE_CHANNEL_SECRET: ' ' })).toThrow(
+      /LINE_CHANNEL_SECRET: required when LINE_MODE=live[\s\S]*LINE_CHANNEL_ACCESS_TOKEN/,
+    );
+    const live = parseEnv({
+      ...valid,
+      LINE_MODE: 'live',
+      LINE_CHANNEL_SECRET: 'FAKE_TEST_VALUE',
+      LINE_CHANNEL_ACCESS_TOKEN: 'FAKE_TEST_VALUE',
+    });
+    expect(live.LINE_MODE).toBe('live');
+    // mock: secret ไม่บังคับ (ไม่มี = ปิดรับ webhook)
+    expect(parseEnv(valid).LINE_CHANNEL_SECRET).toBeUndefined();
+  });
 });

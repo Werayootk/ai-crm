@@ -1,10 +1,14 @@
 import { createClaudeProvider } from '@ai-crm/crm-copilot';
 import { config as loadDotenv } from 'dotenv';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { createApp } from './app';
 import { createPrisma } from './db';
 import { parseEnv, type Env } from './env';
 import { createLogger } from './logger';
+import { generateSuggestions } from './modules/ai/suggestions.service';
+import { createHttpLineClient } from './modules/line/http-line-client';
 import { createMockLineClient } from './modules/line/mock-line-client';
+import { createWebhookProcessor, startWebhookRetryWorker } from './modules/line/webhook-processor';
 
 // production (Railway) ตั้ง env ให้แล้ว — .env ใช้แค่ตอน dev และไม่ทับค่าที่มีอยู่
 loadDotenv({ quiet: true });
@@ -28,8 +32,23 @@ const copilotProvider = env.ANTHROPIC_API_KEY
       effort: env.AI_EFFORT,
     })
   : null;
-// Phase 5 เพิ่ม LINE_MODE=live
-const line = createMockLineClient();
+// env ตรวจแล้วว่า LINE_MODE=live ต้องมี token
+const line =
+  env.LINE_MODE === 'live' && env.LINE_CHANNEL_ACCESS_TOKEN
+    ? createHttpLineClient({ channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN })
+    : createMockLineClient();
+const copilot = { provider: copilotProvider, timeoutMs: env.AI_TIMEOUT_MS };
+
+// ข้อความ LINE เข้า → ให้ AI ร่างคำตอบรออนุมัติ (requestedBy = null คือระบบขอเอง)
+const webhooks = createWebhookProcessor({
+  prisma,
+  logger,
+  line,
+  requestDraft: async (leadId) => {
+    await generateSuggestions({ prisma, logger, copilot, line }, leadId, null);
+  },
+});
+const stopRetryWorker = startWebhookRetryWorker(webhooks, logger);
 
 const app = createApp({
   prisma,
@@ -44,12 +63,18 @@ const app = createApp({
     aiRateLimit: { windowMs: 60_000, limit: 20 },
     trustProxy: env.TRUST_PROXY,
   },
-  copilot: { provider: copilotProvider, timeoutMs: env.AI_TIMEOUT_MS },
+  copilot,
   line,
+  lineChannelSecret: env.LINE_CHANNEL_SECRET ?? null,
+  webhooks,
 });
 
 logger.info(
-  { ai: copilotProvider ? env.AI_MODEL : 'fallback-only', line: line.mode },
+  {
+    ai: copilotProvider ? env.AI_MODEL : 'fallback-only',
+    line: line.mode,
+    lineWebhook: env.LINE_CHANNEL_SECRET ? 'enabled' : 'disabled',
+  },
   'integrations configured',
 );
 
@@ -63,8 +88,12 @@ const server = app.listen(env.PORT, (error) => {
 
 function shutdown(signal: NodeJS.Signals): void {
   logger.info({ signal }, 'shutting down');
+  stopRetryWorker();
   server.close(() => {
-    void prisma.$disconnect().finally(() => process.exit(0));
+    // รองานในคิวสักครู่ — ที่ยังไม่เสร็จอยู่ใน DB แล้ว process ถัดไปเก็บไปทำต่อ
+    void Promise.race([webhooks.idle(), sleep(10_000)])
+      .then(() => prisma.$disconnect())
+      .finally(() => process.exit(0));
   });
 }
 

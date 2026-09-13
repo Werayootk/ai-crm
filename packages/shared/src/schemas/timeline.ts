@@ -43,6 +43,8 @@ export const messageSchema = z.object({
   sentBy: entityRefSchema.nullable(),
   /** ส่งจาก AI draft ที่คน approve แล้ว */
   fromAiSuggestion: z.boolean(),
+  /** outbound ที่ส่งไม่สำเร็จ: เหตุผลล่าสุด (กดส่งซ้ำได้) */
+  lastError: z.string().nullable(),
 });
 export type Message = z.infer<typeof messageSchema>;
 

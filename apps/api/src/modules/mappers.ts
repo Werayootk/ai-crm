@@ -194,6 +194,7 @@ export const messageSelect = {
   sentAt: true,
   createdAt: true,
   aiSuggestionId: true,
+  lastError: true,
   sentBy: ref,
 } satisfies Prisma.MessageSelect;
 
@@ -210,5 +211,6 @@ export function toMessage(
     createdAt: iso(row.createdAt),
     sentBy: row.sentBy,
     fromAiSuggestion: row.aiSuggestionId !== null,
+    lastError: row.lastError,
   };
 }

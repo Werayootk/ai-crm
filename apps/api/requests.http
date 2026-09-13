@@ -126,6 +126,44 @@ Content-Type: application/json
 ### Detail (leads)
 GET {{baseUrl}}/contacts/{{contact.response.body.id}}
 
+### ───────── AI Copilot (ผลลัพธ์เป็น PENDING เท่านั้น — ข้อมูลเปลี่ยนเมื่ออนุมัติ) ─────────
+
+### Lead จาก LINE ที่ยังไม่มีใครรับ (ใช้ตัวแรกในตัวอย่างถัดไป)
+# @name lineLeads
+GET {{baseUrl}}/leads?source=LINE&ownerId=unassigned&limit=1
+
+### ขอคำแนะนำ (ไม่มี ANTHROPIC_API_KEY = กติกาสำรอง) — ชุดเดิมที่รออยู่กลายเป็น SUPERSEDED
+# @name suggestions
+POST {{baseUrl}}/leads/{{lineLeads.response.body.items[0].id}}/ai-suggestions
+
+### ประวัติคำแนะนำ
+GET {{baseUrl}}/leads/{{lineLeads.response.body.items[0].id}}/ai-suggestions?status=PENDING
+
+### อนุมัติ (แก้ก่อนได้เฉพาะ field ของ type นั้น: QUALIFICATION = score/summary, NEXT_ACTION = action/dueAt, LINE_REPLY = text)
+POST {{baseUrl}}/ai-suggestions/{{suggestions.response.body.items[0].id}}/approve
+Content-Type: application/json
+
+{}
+
+### ไม่ใช้ (เหตุผลไม่บังคับ)
+POST {{baseUrl}}/ai-suggestions/{{suggestions.response.body.items[1].id}}/reject
+Content-Type: application/json
+
+{ "reason": "ลูกค้ายังไม่พร้อมคุยเรื่องนี้" }
+
+### ───────── LINE ─────────
+# ข้อความเข้า: ใช้ `pnpm line:simulate "ข้อความ"` (ต้องเซ็นลายเซ็นด้วย LINE_CHANNEL_SECRET — เขียนในไฟล์นี้ไม่ได้)
+
+### ตอบลูกค้าทาง LINE เอง (contact ต้องผูก LINE แล้ว ไม่งั้น 409) — LINE_MODE=mock ไม่ส่งถึงลูกค้าจริง
+# @name lineMessage
+POST {{baseUrl}}/leads/{{lineLeads.response.body.items[0].id}}/messages
+Content-Type: application/json
+
+{ "text": "ขอบคุณที่ติดต่อเข้ามา เดี๋ยวทีมงานโทรกลับภายในวันนี้" }
+
+### ส่งซ้ำ (เฉพาะข้อความที่ FAILED — ใช้ retry key เดิม)
+POST {{baseUrl}}/messages/{{lineMessage.response.body.id}}/retry
+
 ### ───────── Admin only ─────────
 
 ### Login (admin)
@@ -133,6 +171,13 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 { "email": "admin@demo.local", "password": "{{password}}" }
+
+### Webhook event จาก LINE ที่ประมวลผลไม่สำเร็จ
+# @name failedEvents
+GET {{baseUrl}}/webhook-events?status=FAILED&limit=20
+
+### สั่งประมวลผลใหม่ทันที (FAILED / ค้าง RECEIVED เท่านั้น)
+POST {{baseUrl}}/webhook-events/{{failedEvents.response.body.items[0].id}}/retry
 
 ### Delete contact (409 ถ้ายังมี lead อ้างอิง)
 DELETE {{baseUrl}}/contacts/{{contact.response.body.id}}

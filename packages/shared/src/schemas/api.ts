@@ -4,11 +4,15 @@ export const API_ERROR_CODES = [
   'VALIDATION_ERROR',
   'INVALID_JSON',
   'UNAUTHENTICATED',
+  /** webhook ที่ลายเซ็นไม่ถูก */
+  'INVALID_SIGNATURE',
   'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
   'PAYLOAD_TOO_LARGE',
   'RATE_LIMITED',
+  /** ฟีเจอร์ที่ยังไม่ได้ตั้งค่า (เช่น LINE webhook ไม่มี channel secret) */
+  'SERVICE_UNAVAILABLE',
   'INTERNAL_ERROR',
 ] as const;
 export const apiErrorCodeSchema = z.enum(API_ERROR_CODES);

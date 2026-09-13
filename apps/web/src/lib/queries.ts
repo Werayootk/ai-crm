@@ -5,6 +5,7 @@ import type { Query } from './api';
 import { api } from './endpoints';
 
 export const queryKeys = {
+  health: ['health'] as const,
   me: ['me'] as const,
   users: ['users'] as const,
   leads: ['leads'] as const,
@@ -19,6 +20,11 @@ export const queryKeys = {
   contacts: ['contacts'] as const,
   contact: (id: string) => ['contact', id] as const,
 };
+
+/** โหมดของ AI / LINE (จริงหรือจำลอง) — ใช้บอกผู้ใช้ว่าข้อความถึงลูกค้าจริงหรือไม่ */
+export function useHealth() {
+  return useQuery({ queryKey: queryKeys.health, queryFn: api.health, staleTime: 60_000 });
+}
 
 export function useMe() {
   return useQuery({ queryKey: queryKeys.me, queryFn: api.auth.me, staleTime: 5 * 60_000 });

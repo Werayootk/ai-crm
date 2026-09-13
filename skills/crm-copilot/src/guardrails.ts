@@ -81,6 +81,11 @@ function firstName(name: string): string {
   return cleaned.split(/\s+/)[0] ?? cleaned;
 }
 
+/** "คุณสมชาย" ติดกัน แต่ชื่ออังกฤษเว้นวรรค: "คุณ John" */
+function thaiHonorific(name: string): string {
+  return /^[A-Za-z]/.test(name) ? `คุณ ${name}` : `คุณ${name}`;
+}
+
 /** ข้อความตอบกลับที่ปลอดภัย — ไม่ผูกมัดราคา / วันส่งมอบ ใช้ตอน AI ใช้ไม่ได้หรือ reply ผิดกติกา */
 export function safeReplyTemplate(input: CopilotInput): string {
   const name = firstName(input.contact.name);
@@ -88,7 +93,7 @@ export function safeReplyTemplate(input: CopilotInput): string {
   if (detectLanguage(lastText) === 'en') {
     return `Hi ${name}, thank you for reaching out. Our team has received your message and will get back to you with details within the next business day. Could you share the scope of work and your preferred timeline so we can prepare the right information?`;
   }
-  return `สวัสดีคุณ${name} ขอบคุณที่ติดต่อเข้ามา ทีมงานได้รับข้อความแล้ว และจะติดต่อกลับพร้อมรายละเอียดภายในวันทำการถัดไป หากสะดวก รบกวนแจ้งขอบเขตงานและช่วงเวลาที่ต้องการเริ่มเพิ่มเติม เพื่อให้เตรียมข้อมูลได้ตรงความต้องการ`;
+  return `สวัสดี${thaiHonorific(name)} ขอบคุณที่ติดต่อเข้ามา ทีมงานได้รับข้อความแล้ว และจะติดต่อกลับพร้อมรายละเอียดภายในวันทำการถัดไป หากสะดวก รบกวนแจ้งขอบเขตงานและช่วงเวลาที่ต้องการเริ่มเพิ่มเติม เพื่อให้เตรียมข้อมูลได้ตรงความต้องการ`;
 }
 
 export function applyGuardrails(output: CopilotOutput, input: CopilotInput): CopilotOutput {

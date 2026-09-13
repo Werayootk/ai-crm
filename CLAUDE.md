@@ -2,7 +2,7 @@
 
 คู่มือสำหรับ Claude Code ในโปรเจกต์ **ai-crm** — อ่านให้ครบก่อนเริ่มงานทุกครั้ง
 
-> **สถานะปัจจุบัน:** Phase 1–4 เสร็จ (foundation, auth + CRM API, web UI + ไฟล์ deploy, AI Copilot + approval flow) — ขั้นตอน deploy บน Railway ต้องใช้บัญชีผู้ใช้ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ถัดไป Phase 5 (LINE OA)
+> **สถานะปัจจุบัน:** Phase 1–5 เสร็จ (foundation, auth + CRM API, web UI + ไฟล์ deploy, AI Copilot + approval flow, LINE OA) — ขั้นตอน deploy บน Railway และตั้งค่า LINE OA ต้องใช้บัญชีผู้ใช้ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ถัดไป Phase 6 (hardening + handover)
 > แผน: [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) · โจทย์: [docs/assignment.pdf](docs/assignment.pdf) (หน้า 1–3 JD, หน้า 4–5 โจทย์)
 
 ## คำสั่งที่ใช้บ่อย (รันที่ root)
@@ -18,6 +18,7 @@ pnpm dev            # web http://localhost:3000 + api http://localhost:4000
 pnpm test           # vitest (shared, crm-copilot, api กับ DB ai_crm_test, web)
 pnpm lint && pnpm typecheck && pnpm build
 pnpm --filter @ai-crm/crm-copilot eval   # eval 7 เคสของ skill (ใช้ Claude ถ้ามี ANTHROPIC_API_KEY ใน apps/api/.env ไม่งั้นทดสอบกติกาสำรอง)
+pnpm line:simulate "ข้อความ"             # ส่ง webhook LINE ที่เซ็นแล้วเข้า api ในเครื่อง (ต้องตั้ง LINE_CHANNEL_SECRET) — --repeat 2 / --user / --bad-signature
 
 # production image ทั้งชุดในเครื่อง (จำลอง Railway) — web ที่ http://localhost:3100
 JWT_SECRET=$(openssl rand -base64 48) docker compose -f docker-compose.prod.yml up --build
@@ -54,6 +55,15 @@ env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `a
 - ข้อมูลที่ส่งให้ AI สร้างใน `apps/api/src/modules/ai/context.ts` เท่านั้น — ห้ามส่ง email/phone/lineUserId
 - output ของ AI ลงตาราง `AiSuggestion` สถานะ PENDING เท่านั้น; การเขียนจริงอยู่ใน `approveSuggestion` (claim ด้วย `updateMany` → side effect + activity `AI_APPROVED` ใน transaction เดียว → ส่ง LINE หลัง commit) และ field ที่แก้ได้ต่อ type กำหนดใน `APPROVE_FIELDS` ของ shared
 - env: `ANTHROPIC_API_KEY` (ว่าง = กติกาสำรอง), `AI_MODEL` (default `claude-sonnet-5`), `AI_EFFORT`, `AI_TIMEOUT_MS`, `LINE_MODE` — `/api/health` บอกโหมด `ai: claude|fallback`, `line: live|mock`
+
+## แนวทางฝั่ง LINE (ใช้ตั้งแต่ Phase 5)
+
+- รูปแบบ API ของ LINE ยึดตาม OpenAPI ทางการ (`github.com/line/line-openapi`) และเอกสาร LINE Developers — ไม่เขียนจากความจำ
+- webhook (`modules/line/webhook.routes.ts`) mount ก่อน `express.json()`: ตรวจ `x-line-signature` กับ body ดิบ (HMAC-SHA256 + `timingSafeEqual`) → บันทึก `WebhookEvent` (`createManyAndReturn` + `skipDuplicates` กัน `webhookEventId` ซ้ำ) → ตอบ 200 → ประมวลผลในคิว
+- ประมวลผล event ใน `webhook.service.ts` (เรียกซ้ำได้: event ที่ PROCESSED/IGNORED แล้วข้าม, `lineMessageId` unique กันซ้ำชั้นที่ 2); ล้มแล้ว `webhook-processor.ts` บันทึก FAILED + `nextRetryAt` (1/5/15/60 นาที) และ retry worker เก็บไปทำใหม่ — คิวอยู่ในหน่วยความจำ จึงรัน api ได้ instance เดียว
+- ส่งออกทุกทาง (AI ที่อนุมัติแล้ว / คนพิมพ์เอง / ส่งซ้ำ) ผ่าน `deliverMessage` เท่านั้น — Push API + `X-Line-Retry-Key` เดิมทุกครั้ง, 409 = LINE รับไปแล้ว, retry เองเฉพาะ 5xx / network
+- test ใช้ `createMockLineClient()` (`failNext` จำลอง LINE ล่ม, `afterAccept` จำลองคำตอบหาย) — ห้ามเรียก LINE จริงใน test
+- env: `LINE_MODE` (`mock` | `live`), `LINE_CHANNEL_SECRET` (ไม่ตั้ง = webhook ตอบ 503), `LINE_CHANNEL_ACCESS_TOKEN` (บังคับเมื่อ `live`)
 
 ## ข้อควรรู้ของ stack (ตรวจแล้วตอน Phase 1)
 

@@ -11,6 +11,7 @@ import type {
   leadStageChangeInputSchema,
   leadUpdateInputSchema,
   loginInputSchema,
+  MessageCreateInput,
 } from '@ai-crm/shared';
 import {
   activitySchema,
@@ -21,8 +22,10 @@ import {
   companySchema,
   contactDetailSchema,
   contactSchema,
+  healthResponseSchema,
   leadDetailSchema,
   leadListItemSchema,
+  messageSchema,
   pageSchema,
   pipelineSummarySchema,
   timelinePageSchema,
@@ -39,6 +42,7 @@ const contactPageSchema = pageSchema(contactSchema);
 type Input<S extends z.ZodType> = z.input<S>;
 
 export const api = {
+  health: () => apiGet(healthResponseSchema, '/health'),
   auth: {
     me: () => apiGet(authResponseSchema, '/auth/me'),
     login: (body: Input<typeof loginInputSchema>) =>
@@ -76,6 +80,12 @@ export const api = {
       apiSend(aiSuggestionDecisionSchema, 'POST', `/ai-suggestions/${id}/approve`, body),
     reject: (id: string, body: AiSuggestionRejectInput) =>
       apiSend(aiSuggestionDecisionSchema, 'POST', `/ai-suggestions/${id}/reject`, body),
+  },
+  messages: {
+    /** คนพิมพ์ตอบทาง LINE เอง — คืนข้อความพร้อมสถานะ SENT / FAILED */
+    send: (leadId: string, body: MessageCreateInput) =>
+      apiSend(messageSchema, 'POST', `/leads/${leadId}/messages`, body),
+    retry: (id: string) => apiSend(messageSchema, 'POST', `/messages/${id}/retry`),
   },
   companies: {
     list: (query: Query) => apiGet(companyPageSchema, '/companies', query),

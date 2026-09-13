@@ -6,10 +6,13 @@ import request from 'supertest';
 import { createApp, type AppConfig, type AppDeps } from '../src/app';
 import type { PrismaClient, UserRole } from '../src/generated/prisma/client';
 import { createMockLineClient } from '../src/modules/line/mock-line-client';
+import { createWebhookProcessor } from '../src/modules/line/webhook-processor';
 
 export const silentLogger = pino({ level: 'silent' });
 
 export const TEST_PASSWORD = 'correct-horse-battery-staple';
+/** channel secret ปลอมของ test — ใช้เซ็น webhook ที่ส่งเข้า test app */
+export const TEST_LINE_SECRET = 'test-only-line-channel-secret';
 
 export const testConfig: AppConfig = {
   session: {
@@ -35,16 +38,27 @@ const openServers = new Set<Server>();
  */
 export async function createTestApp(
   prisma: PrismaClient,
-  overrides: Partial<AppConfig> & Partial<Pick<AppDeps, 'copilot' | 'line'>> = {},
+  overrides: Partial<AppConfig> &
+    Partial<Pick<AppDeps, 'copilot' | 'line' | 'lineChannelSecret' | 'webhooks'>> = {},
 ): Promise<TestApp> {
-  const { copilot, line, ...config } = overrides;
+  const {
+    copilot,
+    line = createMockLineClient(),
+    lineChannelSecret,
+    webhooks,
+    ...config
+  } = overrides;
   const app = createApp({
     prisma,
     logger: silentLogger,
     config: { ...testConfig, ...config },
     copilot: copilot ?? { provider: null, timeoutMs: 1_000 },
-    line: line ?? createMockLineClient(),
+    line,
     lineRetryDelaysMs: [0, 0],
+    lineChannelSecret: lineChannelSecret === undefined ? TEST_LINE_SECRET : lineChannelSecret,
+    webhooks:
+      webhooks ??
+      createWebhookProcessor({ prisma, logger: silentLogger, line, requestDraft: null }),
   });
   const server = createServer(app);
   await new Promise<void>((resolve, reject) => {

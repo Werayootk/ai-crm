@@ -35,21 +35,32 @@ const CONFIDENCE_TEXT = {
 };
 
 function SourceNote({ suggestion }: { suggestion: AiSuggestion }) {
+  // requestedBy = null คือระบบขอเองตอนลูกค้าทักเข้ามาทาง LINE
+  const origin =
+    suggestion.requestedBy === null ? (
+      <p className="text-xs text-slate-500">ร่างอัตโนมัติเมื่อลูกค้าทักเข้ามาทาง LINE</p>
+    ) : null;
   if (suggestion.source === 'LLM') {
     return (
-      <p className="text-xs text-slate-500">
-        ที่มา: {suggestion.aiModel}
-        {suggestion.latencyMs === null
-          ? ''
-          : ` · ${(suggestion.latencyMs / 1000).toFixed(1)} วินาที`}
-      </p>
+      <div className="space-y-0.5">
+        {origin}
+        <p className="text-xs text-slate-500">
+          ที่มา: {suggestion.aiModel}
+          {suggestion.latencyMs === null
+            ? ''
+            : ` · ${(suggestion.latencyMs / 1000).toFixed(1)} วินาที`}
+        </p>
+      </div>
     );
   }
   return (
-    <p className="flex flex-wrap items-center gap-1.5 text-xs text-amber-800">
-      <Badge className="bg-amber-50 text-amber-800 ring-amber-200">Fallback</Badge>
-      ใช้กติกาสำรอง: {FALLBACK_TEXT[suggestion.fallbackReason ?? ''] ?? suggestion.fallbackReason}
-    </p>
+    <div className="space-y-0.5">
+      {origin}
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-amber-800">
+        <Badge className="bg-amber-50 text-amber-800 ring-amber-200">Fallback</Badge>
+        ใช้กติกาสำรอง: {FALLBACK_TEXT[suggestion.fallbackReason ?? ''] ?? suggestion.fallbackReason}
+      </p>
+    </div>
   );
 }
 

@@ -9,3 +9,4 @@ export * from './schemas/lead';
 export * from './schemas/timeline';
 export * from './schemas/details';
 export * from './schemas/ai';
+export * from './schemas/line';

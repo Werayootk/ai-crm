@@ -258,6 +258,47 @@
 
 **Human review** — Phase 4 commit ตามที่ผู้ใช้สั่ง (22:11, "commit ทีละ phase เอง") รอผู้ใช้ review บน branch
 
+**Phase 4 commit** — 23:07 `d376f06` บน branch `phase-4-ai-copilot` (ไม่ push) แล้วแตก branch `phase-5-line-oa` ต่อ
+
+**Phase 5 — สิ่งที่ AI ทำ (2026-09-13 23:07–23:38)** ยังอยู่ในคำสั่ง #8 ("ทำ Phase 4 - จบ")
+
+- 23:08–23:10 **ตรวจ API ของ LINE จากแหล่งทางการก่อนเขียน**: หน้า reference ของ LINE เป็นแค่สารบัญ → ดาวน์โหลด OpenAPI ทางการ (`line/line-openapi`: `messaging-api.yml`, `webhook.yml`) มาอ่าน + เอกสาร LINE Developers เรื่องตรวจลายเซ็น, retry key (อายุ 24 ชม., 409 = รับไปแล้ว, retry เฉพาะ 5xx / timeout), การรับ webhook (ใช้ `webhookEventId` กันซ้ำ, ปุ่ม Verify ส่ง `events: []`); หาเพดานความยาวข้อความในสเปกไม่เจอ → ตั้งเพดานของเราเอง 2,000 ตัวอักษรและเขียนไว้ชัดว่าไม่ใช่ขีดจำกัดของ LINE
+- 23:16–23:21 shared schema (ส่งข้อความ, webhook event), env (`LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN` บังคับเมื่อ `live`), ตรวจลายเซ็น, HTTP client ของ LINE (ไม่ใช้ SDK), รับ webhook → บันทึก → ตอบ 200 → คิวประมวลผล, map LINE user → contact / lead, retry worker, endpoint ส่งเอง / ส่งซ้ำ / admin ดู-สั่งประมวลผล event ซ้ำ
+- 23:23–23:25 **test ที่โจทย์บังคับ #3** (`webhook.test.ts`) + test การส่ง / ส่งซ้ำ, HTTP client (fetch ปลอม), คิว; เพิ่มโหมด `afterAccept` ใน LINE จำลองเพื่อพิสูจน์ว่า "LINE รับแล้วแต่คำตอบหาย" ลูกค้าได้ข้อความครั้งเดียว
+- 23:30 **mutation test**: แก้โค้ดชั่วคราวให้ยอมรับทุกลายเซ็น → test ความปลอดภัยล้ม 2 ตัว; ปิด `skipDuplicates` → test กันซ้ำล้ม → คืนโค้ดเดิม (ยืนยันว่า test จับ bug ได้จริง ไม่ได้ผ่านเพราะเขียนหลวม)
+- 23:30–23:33 `pnpm line:simulate`, หน้าเว็บ: ช่องพิมพ์ตอบ LINE (ป้าย "โหมดจำลอง"), ข้อความส่งไม่สำเร็จแสดงเหตุผล + ปุ่ม "ส่งอีกครั้ง", การ์ด AI บอกว่า "ร่างอัตโนมัติเมื่อลูกค้าทักเข้ามาทาง LINE"
+- 23:34 เจอ `pnpm dev` ค้างอยู่ตั้งแต่ ~20:19 (ไม่มี terminal ผูก — ของ AI เองจากรอบก่อนที่ปิดไม่หมด) → ตรวจ process ก่อนแล้วจึงปิด
+- 23:35–23:37 ทดลองจริงบนเครื่อง (secret ชั่วคราวส่งผ่าน env ไม่แก้ `.env` ของผู้ใช้): webhook ใหม่ 200 / ซ้ำ `duplicates: 1` / ลายเซ็นผิด 401 → เปิดใน Chrome เห็น lead ใหม่ไม่มีเจ้าของ + ข้อความ + ร่าง AI 3 ใบ → อนุมัติคำตอบ → พิมพ์ตอบเอง → มือถือ; ไม่มี console error
+- 23:38 session หยุดระหว่างแก้ข้อความทักทาย
+
+**สิ่งที่ AI ตรวจเจอจาก browser จริงแล้วแก้** (test อัตโนมัติไม่จับ)
+
+- timeline ขึ้น "สร้าง lead จากข้อความ LINE" **เหนือ**ข้อความแรกของลูกค้า — activity ใช้เวลาตอนประมวลผล แต่ข้อความใช้เวลาที่ลูกค้าส่ง → ให้ activity ก่อนข้อความ 1 ms และเพิ่ม test
+- timeline ขึ้น "ระบบ · ระบบ" สำหรับ activity ที่ระบบสร้างเอง → แสดงครั้งเดียว
+- ร่างของกติกาสำรองขึ้นต้น "สวัสดีคุณLINE" (ไม่มีวรรคหน้าชื่ออังกฤษ) และชื่อชั่วคราวเดิม "ผู้ใช้ LINE …" จะกลายเป็น "สวัสดีคุณผู้ใช้" → ชื่ออังกฤษเว้นวรรค, ชื่อชั่วคราวเป็น "ลูกค้า LINE …" (อ่านเป็น "สวัสดีคุณลูกค้า"), เพิ่ม `PROMPT_VERSION` เป็น `crm-copilot@2` และรัน eval ตามกติกาใน `CLAUDE.md`
+- `pnpm line:simulate` พิมพ์ "เปิดหน้า Leads…" แม้ได้ 401 → พิมพ์เฉพาะตอนสำเร็จ และคืน exit code 1 เมื่อล้ม
+- error handler log 503 ที่ตั้งใจตอบ (webhook ยังไม่ตั้งค่า) ว่า "unhandled error" → เปลี่ยนเป็น warn
+
+---
+
+### #9 · 2026-09-14 03:15 — ทำต่อ
+
+**Prompt**
+
+> ทำต่อ
+
+**สิ่งที่ AI ทำ (03:15–03:25)**
+
+- แก้ 3 จุดที่ค้างจากการตรวจในเบราว์เซอร์ (รายการด้านบน) + test ใหม่ (ลำดับ timeline, ดึงโปรไฟล์ LINE ไม่ได้แต่ยังบันทึกข้อความ, คำทักทายชื่อไทย/อังกฤษ) → eval 7/7
+- ตรวจใน Chrome อีกรอบด้วยผู้ใช้ LINE คนใหม่: ลำดับ timeline ถูก, "ระบบ" ขึ้นครั้งเดียว, ร่างขึ้นต้น "สวัสดีคุณ LINE"
+- **ตรวจกรณีส่งไม่สำเร็จกับ LINE จริง**: รัน api แบบ `LINE_MODE=live` + token ปลอม → LINE ตอบ `401 Authentication failed...` → client อ่านข้อความ error ของ LINE ได้ถูก, ไม่ retry เอง (4xx), หน้าเว็บขึ้นกล่องสีแดง + เหตุผล + ปุ่ม "ส่งอีกครั้ง" → กดแล้วยังล้มพร้อม toast
+- ตัวอย่าง request ของ AI / LINE / admin ใน `requests.http`, ขั้นตอนตั้งค่า LINE OA จริงใน [deploy-railway.md](deploy-railway.md#line-oa) (ชื่อเมนูตรวจจากเอกสาร LINE: สร้าง channel ผ่าน LINE Official Account Manager เท่านั้นตั้งแต่ ก.ย. 2024, webhook ต้อง HTTPS)
+- ผลการตรวจ: test 192/192 ผ่าน 2 รอบติด, lint + typecheck + build ผ่าน
+
+**ยังไม่ได้ทำ (ต้องใช้บัญชีของผู้ใช้)** — สร้าง LINE OA จริง, ใส่ channel secret / token ใน Railway, ทดสอบจากมือถือ
+
+**Human review** — Phase 5 commit ตามคำสั่ง #8 ("commit ทีละ phase เอง") รอผู้ใช้ review บน branch
+
 ---
 
 ## Review / Reject / การเปลี่ยนแปลงหลัง human inspection

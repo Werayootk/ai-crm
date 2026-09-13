@@ -1,7 +1,7 @@
 import type { CopilotInput } from '@ai-crm/shared';
 
 /** เปลี่ยน prompt หรือ output schema เมื่อไร ให้เพิ่มเลข version — เก็บลง AiSuggestion.promptVersion */
-export const PROMPT_VERSION = 'crm-copilot@1';
+export const PROMPT_VERSION = 'crm-copilot@2';
 
 export const SYSTEM_PROMPT = `You are CRM Copilot for a Thai B2B sales team at a digital agency (websites, apps, marketing campaigns, AI and data projects).
 You receive one lead's CRM context and return a structured assessment. A salesperson reviews everything you produce before anything is saved to the CRM or sent to the customer — you only propose.

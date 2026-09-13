@@ -19,7 +19,8 @@
     "db:migrate": "pnpm --filter @ai-crm/api db:migrate",
     "db:deploy": "pnpm --filter @ai-crm/api db:deploy",
     "db:seed": "pnpm --filter @ai-crm/api db:seed",
-    "db:studio": "pnpm --filter @ai-crm/api db:studio"
+    "db:studio": "pnpm --filter @ai-crm/api db:studio",
+    "line:simulate": "pnpm --filter @ai-crm/api line:simulate"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

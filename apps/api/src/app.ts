@@ -13,6 +13,9 @@ import { createCompaniesRouter } from './modules/companies/companies.routes';
 import { createContactsRouter } from './modules/contacts/contacts.routes';
 import { createLeadsRouter } from './modules/leads/leads.routes';
 import type { LineClient } from './modules/line/line-client';
+import { createLineRouter } from './modules/line/line.routes';
+import type { WebhookProcessor } from './modules/line/webhook-processor';
+import { createLineWebhookRouter } from './modules/line/webhook.routes';
 import { createUsersRouter } from './modules/users/users.routes';
 import { createHealthRouter } from './routes/health';
 
@@ -32,6 +35,10 @@ export interface AppDeps {
   line: LineClient;
   /** ระยะรอก่อน retry การส่ง LINE — test ตั้งเป็น 0 */
   lineRetryDelaysMs?: readonly number[];
+  /** ตรวจลายเซ็น webhook — null = ปิดรับ webhook */
+  lineChannelSecret: string | null;
+  /** คิวประมวลผล webhook event (สร้างนอก app เพราะ server ใช้ทำ retry worker และรอให้ว่างก่อนปิด) */
+  webhooks: WebhookProcessor;
 }
 
 const REQUEST_ID_PATTERN = /^[\w-]{1,64}$/;
@@ -59,7 +66,15 @@ export function createApp(deps: AppDeps): Express {
     }),
   );
 
-  // Phase 5: LINE webhook ต้อง mount ก่อนบรรทัดนี้ เพราะต้องใช้ raw body ตรวจ signature
+  // LINE webhook ต้องมาก่อน express.json() — ตรวจลายเซ็นกับ body ดิบ และไม่ต้องผ่าน session
+  app.use(
+    '/api',
+    createLineWebhookRouter({
+      prisma,
+      channelSecret: deps.lineChannelSecret,
+      processor: deps.webhooks,
+    }),
+  );
   app.use(express.json({ limit: '100kb' }));
   app.use(createAuthenticate(prisma, config.session));
 
@@ -69,6 +84,12 @@ export function createApp(deps: AppDeps): Express {
     copilot: deps.copilot,
     line: deps.line,
     ...(deps.lineRetryDelaysMs ? { lineRetryDelaysMs: deps.lineRetryDelaysMs } : {}),
+  };
+  const outboundDeps = {
+    prisma,
+    logger,
+    line: deps.line,
+    ...(deps.lineRetryDelaysMs ? { retryDelaysMs: deps.lineRetryDelaysMs } : {}),
   };
 
   const api = Router();
@@ -86,6 +107,7 @@ export function createApp(deps: AppDeps): Express {
   api.use(createContactsRouter(prisma));
   api.use(createLeadsRouter(prisma));
   api.use(createAiRouter({ ...aiDeps, rateLimit: config.aiRateLimit }));
+  api.use(createLineRouter({ ...outboundDeps, processor: deps.webhooks }));
   app.use('/api', api);
 
   app.use(notFoundHandler);

@@ -116,8 +116,8 @@ function ActivityEntry({ item, leadId }: { item: ActivityItem; leadId: string })
       <p className="text-xs text-slate-500">
         <span className="font-medium text-slate-700">{ACTIVITY_LABEL[item.type]}</span>
         {' · '}
-        {item.actor?.name ?? 'ระบบ'}
-        {' · '}
+        {/* SYSTEM ที่ไม่มีคนทำ (เช่น จาก LINE webhook) ไม่ต้องขึ้น "ระบบ" ซ้ำ */}
+        {item.actor ? `${item.actor.name} · ` : item.type === 'SYSTEM' ? '' : 'ระบบ · '}
         <time dateTime={item.createdAt} title={formatDateTime(item.createdAt)}>
           {formatRelative(item.createdAt)}
         </time>
@@ -160,20 +160,40 @@ function ActivityEntry({ item, leadId }: { item: ActivityItem; leadId: string })
   );
 }
 
-function MessageEntry({ item }: { item: MessageItem }) {
+function MessageEntry({ item, leadId }: { item: MessageItem; leadId: string }) {
   const inbound = item.direction === 'INBOUND';
+  const failed = item.status === 'FAILED';
+  const invalidate = useInvalidateLeads();
+  const toast = useToast();
+  const retry = useMutation({
+    mutationFn: () => api.messages.retry(item.id),
+    onSuccess: async (message) => {
+      if (message.status === 'SENT') toast.success('ส่งทาง LINE แล้ว');
+      else toast.error(`ยังส่งไม่สำเร็จ: ${message.lastError ?? 'ไม่ทราบสาเหตุ'}`);
+      await invalidate(leadId);
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
   return (
-    <div className={cx('flex min-w-0 flex-1', inbound ? 'justify-start' : 'justify-end')}>
+    <div className={cx('flex min-w-0 flex-1 flex-col', inbound ? 'items-start' : 'items-end')}>
       <div
         className={cx(
           'max-w-[85%] rounded-2xl px-3 py-2 text-sm',
           inbound
             ? 'rounded-tl-sm bg-slate-100 text-slate-800'
-            : 'rounded-tr-sm bg-indigo-600 text-white',
+            : failed
+              ? 'rounded-tr-sm bg-rose-50 text-rose-900 ring-1 ring-rose-200'
+              : 'rounded-tr-sm bg-indigo-600 text-white',
         )}
       >
         <p className="whitespace-pre-wrap">{item.text}</p>
-        <p className={cx('mt-1 text-[11px]', inbound ? 'text-slate-500' : 'text-indigo-100')}>
+        <p
+          className={cx(
+            'mt-1 text-[11px]',
+            inbound ? 'text-slate-500' : failed ? 'text-rose-700' : 'text-indigo-100',
+          )}
+        >
           {item.channel === 'LINE' ? 'LINE' : 'ฟอร์มเว็บ'}
           {inbound
             ? ''
@@ -185,6 +205,19 @@ function MessageEntry({ item }: { item: MessageItem }) {
           </time>
         </p>
       </div>
+      {failed ? (
+        <div className="mt-1.5 flex max-w-[85%] flex-wrap items-center justify-end gap-2 text-xs">
+          {item.lastError ? <span className="text-rose-700">{item.lastError}</span> : null}
+          <Button
+            variant="secondary"
+            className="px-2 py-1 text-xs"
+            loading={retry.isPending}
+            onClick={() => retry.mutate()}
+          >
+            ส่งอีกครั้ง
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -214,7 +247,7 @@ export function Timeline({ leadId }: { leadId: string }) {
               {item.kind === 'activity' ? (
                 <ActivityEntry item={item} leadId={leadId} />
               ) : (
-                <MessageEntry item={item} />
+                <MessageEntry item={item} leadId={leadId} />
               )}
             </li>
           ))}

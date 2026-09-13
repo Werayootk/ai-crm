@@ -43,8 +43,11 @@ export function createErrorHandler(): ErrorRequestHandler {
       return;
     }
     const httpError = toHttpError(err);
-    if (httpError.status >= 500) {
+    if (!(err instanceof HttpError) && httpError.status >= 500) {
       req.log.error({ err }, 'unhandled error');
+    } else if (httpError.status >= 500) {
+      // 5xx ที่ตั้งใจตอบ (เช่น LINE webhook ยังไม่ตั้งค่า) — ไม่ใช่ bug
+      req.log.warn({ code: httpError.code }, httpError.message);
     }
     const body: ApiErrorResponse = {
       error: {
