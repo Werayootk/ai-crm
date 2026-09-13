@@ -2,7 +2,7 @@
 
 คู่มือสำหรับ Claude Code ในโปรเจกต์ **ai-crm** — อ่านให้ครบก่อนเริ่มงานทุกครั้ง
 
-> **สถานะปัจจุบัน:** Phase 1 (foundation) เสร็จ — monorepo, Prisma schema + migration + seed, `GET /api/health`, หน้าเว็บตรวจสถานะ, CI
+> **สถานะปัจจุบัน:** Phase 1 (foundation) + Phase 2 (auth + CRM API 23 endpoints) เสร็จ — ถัดไป Phase 3 (web UI + deploy)
 > แผน: [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) · โจทย์: [docs/assignment.pdf](docs/assignment.pdf) (หน้า 1–3 JD, หน้า 4–5 โจทย์)
 
 ## คำสั่งที่ใช้บ่อย (รันที่ root)
@@ -20,6 +20,17 @@ pnpm lint && pnpm typecheck && pnpm build
 ```
 
 env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `apps/web/.env.example` → `apps/web/.env.local`
+ลองเรียก API ด้วยมือ: [apps/api/requests.http](apps/api/requests.http) (VS Code REST Client — อ่านรหัสผ่านจาก `.env`)
+
+## แนวทางเขียน API (ใช้ตั้งแต่ Phase 2)
+
+- ทุก endpoint ห่อด้วย `route({ auth, params?, query?, body? }, handler)` จาก `apps/api/src/http/route.ts` — ต้องประกาศ `auth: 'public' | 'user' | 'admin'` เสมอ และ zod validate ก่อนเข้า handler
+- schema ของ request/response อยู่ใน `packages/shared/src/schemas/` (web ใช้ตัวเดียวกัน) — API แปลง Prisma row เป็น DTO ผ่าน `select` + mapper ใน `apps/api/src/modules/mappers.ts` เท่านั้น ห้ามส่ง row ของ Prisma ออกไปตรงๆ
+- error: โยน `HttpError` / `validationError` / `notFound` จาก `http/errors.ts`; error ของ Prisma ที่มีความหมายเฉพาะใช้ `withPrismaErrors` แปลงเป็น 409/404
+- กันการเขียนทับกัน: ใช้ `updateMany({ where: { id, <สถานะเดิม> } })` แล้วเช็ค `count` (เช่น stage change) — approve AI suggestion ใน Phase 4 ใช้แบบเดียวกัน
+- `$transaction` เก็บแค่การเขียนที่ต้อง atomic แล้วอ่านข้อมูลที่จะตอบกลับหลัง commit (อ่าน relation ซ้อนใน transaction ทำให้ `pg` เตือนและจะพังใน pg@9)
+- event สำคัญทางธุรกิจ log ด้วย `req.log.info({ ...ids }, 'message')`; activity ประเภท STAGE_CHANGE / SYSTEM / AI_* ระบบสร้างเท่านั้น
+- test: supertest + DB `ai_crm_test`, ใช้ `createTestApp`, `createUser`, `loginAs` ใน `apps/api/test/helpers.ts` และ fixture ใน `apps/api/test/fixtures.ts`
 
 ## ข้อควรรู้ของ stack (ตรวจแล้วตอน Phase 1)
 
@@ -148,4 +159,5 @@ docs/         โจทย์ แผน (docs/plans/) และ AI-usage log
 ## 6. เอกสารการทำงาน
 
 - **แผน** เก็บที่ `docs/plans/YYYY-MM-DD-<หัวข้อ>.md` โดยใส่วันที่และสถานะ (Draft / Approved) ไว้ที่หัวไฟล์ — ห้ามเริ่มโค้ดของ phase ใดจนกว่าผู้ใช้จะสั่ง
+- **Git**: แต่ละ phase อยู่บน branch ของตัวเอง (`phase-<n>-<หัวข้อ>` แตกต่อจาก phase ก่อนหน้า) และ commit เมื่อผู้ใช้อนุมัติเท่านั้น — ไม่ commit ตรงเข้า `main`, ไม่ push เอง, ไม่ commit `docs/assignment.pdf`
 - **AI-usage log** — ทุก session ที่ใช้ AI ต้องต่อท้าย [docs/ai-usage-log.md](docs/ai-usage-log.md): วันเวลา (UTC+07:00 ดึงจาก transcript หรือเวลาไฟล์ ห้ามเดา), prompt ต้นฉบับ, สิ่งที่ AI ทำ, ผลลัพธ์, สิ่งที่คน review/reject และอัปเดตตาราง "Review / Reject" ท้ายไฟล์

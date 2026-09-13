@@ -1,25 +1,29 @@
 import type { HealthResponse } from '@ai-crm/shared';
 import { Router } from 'express';
 import type { PrismaClient } from '../generated/prisma/client';
+import { route } from '../http/route';
 
 const DB_PING_TIMEOUT_MS = 2_000;
 
 export function createHealthRouter(prisma: PrismaClient): Router {
   const router = Router();
 
-  router.get('/health', async (req, res) => {
-    const ping = await pingDb(prisma);
-    if (!ping.ok) {
-      req.log.warn({ err: ping.error }, 'health check: database ping failed');
-    }
-    const body: HealthResponse = {
-      status: ping.ok ? 'ok' : 'degraded',
-      db: ping.ok ? 'up' : 'down',
-      uptimeSec: Math.floor(process.uptime()),
-      time: new Date().toISOString(),
-    };
-    res.status(ping.ok ? 200 : 503).json(body);
-  });
+  router.get(
+    '/health',
+    route({ auth: 'public' }, async ({ req, res }) => {
+      const ping = await pingDb(prisma);
+      if (!ping.ok) {
+        req.log.warn({ err: ping.error }, 'health check: database ping failed');
+      }
+      const body: HealthResponse = {
+        status: ping.ok ? 'ok' : 'degraded',
+        db: ping.ok ? 'up' : 'down',
+        uptimeSec: Math.floor(process.uptime()),
+        time: new Date().toISOString(),
+      };
+      res.status(ping.ok ? 200 : 503).json(body);
+    }),
+  );
 
   return router;
 }

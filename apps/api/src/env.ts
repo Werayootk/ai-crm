@@ -5,6 +5,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//, 'must be a postgres:// connection string'),
+  JWT_SECRET: z.string().min(32, 'must be at least 32 characters'),
+  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(8),
+  /** จำนวน proxy ที่อยู่หน้า API (local ผ่าน Next = 1, Railway ผ่าน edge + Next = 2) */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

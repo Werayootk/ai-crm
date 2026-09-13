@@ -17,7 +17,19 @@ try {
 
 const logger = createLogger(env);
 const prisma = createPrisma(env.DATABASE_URL);
-const app = createApp({ prisma, logger });
+const app = createApp({
+  prisma,
+  logger,
+  config: {
+    session: {
+      secret: env.JWT_SECRET,
+      ttlSeconds: env.SESSION_TTL_HOURS * 3600,
+      secureCookies: env.NODE_ENV === 'production',
+    },
+    loginRateLimit: { windowMs: 15 * 60_000, limit: 10 },
+    trustProxy: env.TRUST_PROXY,
+  },
+});
 
 const server = app.listen(env.PORT, (error) => {
   if (error) {

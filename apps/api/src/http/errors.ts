@@ -1,5 +1,6 @@
 import type { ApiErrorCode, ApiErrorResponse } from '@ai-crm/shared';
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { Prisma } from '../generated/prisma/client';
 
 export class HttpError extends Error {
   constructor(
@@ -11,6 +12,23 @@ export class HttpError extends Error {
     super(message);
     this.name = 'HttpError';
   }
+}
+
+export interface FieldIssue {
+  path: string;
+  message: string;
+}
+
+export function validationError(message: string, issues: FieldIssue[]): HttpError {
+  return new HttpError(400, 'VALIDATION_ERROR', message, { issues });
+}
+
+export function notFound(entity: string): HttpError {
+  return new HttpError(404, 'NOT_FOUND', `${entity} not found`);
+}
+
+export function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025'): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 }
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
@@ -41,6 +59,16 @@ export function createErrorHandler(): ErrorRequestHandler {
 
 function toHttpError(err: unknown): HttpError {
   if (err instanceof HttpError) return err;
+
+  // service จัดการกรณีที่รู้ความหมายเองแล้ว — ตรงนี้เป็นตาข่ายสุดท้าย
+  if (isPrismaError(err, 'P2025')) return new HttpError(404, 'NOT_FOUND', 'Record not found');
+  if (isPrismaError(err, 'P2002')) {
+    return new HttpError(409, 'CONFLICT', 'A record with the same unique value already exists');
+  }
+  if (isPrismaError(err, 'P2003')) {
+    return new HttpError(409, 'CONFLICT', 'The record is referenced by other records');
+  }
+
   // error จาก express.json() มี field `type`
   const type =
     typeof err === 'object' && err !== null && 'type' in err && typeof err.type === 'string'

@@ -1,0 +1,144 @@
+### AI CRM API — ตัวอย่าง request ทุก endpoint (VS Code extension "REST Client")
+# ต้องรัน: pnpm db:up && pnpm db:seed && pnpm dev
+# รหัสผ่านอ่านจาก SEED_DEMO_PASSWORD ใน apps/api/.env — ไม่เขียนลงไฟล์นี้
+# REST Client จำ session cookie จาก login ให้ request ถัดไปเอง
+
+@baseUrl = http://localhost:4000/api
+@password = {{$dotenv SEED_DEMO_PASSWORD}}
+
+### Health (public)
+GET {{baseUrl}}/health
+
+### ───────── Auth ─────────
+
+### Login (sales) — ตั้ง httpOnly cookie `crm_session`
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "sales01@demo.local", "password": "{{password}}" }
+
+### Current user
+GET {{baseUrl}}/auth/me
+
+### Users (dropdown owner)
+GET {{baseUrl}}/users
+
+### ───────── Leads ─────────
+
+### List: search + filter + sort (stage รับหลายค่าคั่นด้วย , ได้; ownerId = me | unassigned | <id>)
+# @name leads
+GET {{baseUrl}}/leads?stage=NEW,QUALIFIED&ownerId=me&sort=value&order=desc&limit=20
+
+### หน้าถัดไป — ส่ง nextCursor กลับไป
+GET {{baseUrl}}/leads?stage=NEW,QUALIFIED&ownerId=me&sort=value&order=desc&limit=20&cursor={{leads.response.body.nextCursor}}
+
+### Lead จาก LINE ที่ยังไม่มีใครรับ
+GET {{baseUrl}}/leads?source=LINE&ownerId=unassigned
+
+### Pipeline summary (จำนวน + มูลค่ารวมต่อ stage)
+GET {{baseUrl}}/leads/pipeline?ownerId=me
+
+### Create lead พร้อม contact ใหม่ (ไม่ส่ง ownerId = ผู้สร้างเป็น owner)
+# @name createLead
+POST {{baseUrl}}/leads
+Content-Type: application/json
+
+{
+  "title": "AI Chatbot สำหรับบริการลูกค้า — ตัวอย่าง",
+  "value": 480000,
+  "contact": { "name": "คุณตัวอย่าง ทดลองใช้", "email": "sample.contact@demo.example", "phone": "081-000-0000" }
+}
+
+### Lead detail
+GET {{baseUrl}}/leads/{{createLead.response.body.id}}
+
+### Update (owner / score / value ถูกบันทึกเป็น audit activity)
+PATCH {{baseUrl}}/leads/{{createLead.response.body.id}}
+Content-Type: application/json
+
+{ "score": 65, "summary": "ลูกค้าต้องการเริ่มภายในไตรมาสหน้า" }
+
+### Stage: NEW → QUALIFIED
+PATCH {{baseUrl}}/leads/{{createLead.response.body.id}}/stage
+Content-Type: application/json
+
+{ "stage": "QUALIFIED" }
+
+### Stage ผิดกติกา: QUALIFIED → WON → 409 (details.allowed บอก stage ที่ไปได้)
+PATCH {{baseUrl}}/leads/{{createLead.response.body.id}}/stage
+Content-Type: application/json
+
+{ "stage": "WON" }
+
+### LOST ต้องมีเหตุผล (ไม่ส่ง lostReason → 400)
+PATCH {{baseUrl}}/leads/{{createLead.response.body.id}}/stage
+Content-Type: application/json
+
+{ "stage": "LOST", "lostReason": "เลือกผู้ให้บริการรายอื่น" }
+
+### Timeline (activities + messages ใหม่ → เก่า)
+GET {{baseUrl}}/leads/{{createLead.response.body.id}}/timeline?limit=20
+
+### เพิ่ม task
+# @name task
+POST {{baseUrl}}/leads/{{createLead.response.body.id}}/activities
+Content-Type: application/json
+
+{ "type": "TASK", "body": "ส่งใบเสนอราคา", "dueAt": "2026-12-01T09:00:00.000Z" }
+
+### ปิด task
+PATCH {{baseUrl}}/activities/{{task.response.body.id}}/complete
+
+### ───────── Companies ─────────
+
+### List + search
+GET {{baseUrl}}/companies?q=สยาม&limit=10
+
+### Create
+# @name company
+POST {{baseUrl}}/companies
+Content-Type: application/json
+
+{ "name": "บริษัท ตัวอย่างใหม่ จำกัด", "domain": "sample-new.example", "industry": "Retail", "employeeCount": 80 }
+
+### Detail (contacts + leads)
+GET {{baseUrl}}/companies/{{company.response.body.id}}
+
+### Update
+PATCH {{baseUrl}}/companies/{{company.response.body.id}}
+Content-Type: application/json
+
+{ "industry": "E-commerce" }
+
+### ───────── Contacts ─────────
+
+### List: search ชื่อ / email / เบอร์ + เฉพาะที่ผูก LINE แล้ว
+GET {{baseUrl}}/contacts?q=08&hasLine=true&limit=10
+
+### Create
+# @name contact
+POST {{baseUrl}}/contacts
+Content-Type: application/json
+
+{ "name": "คุณผู้ติดต่อ ตัวอย่าง", "email": "another.contact@demo.example", "companyId": "{{company.response.body.id}}" }
+
+### Detail (leads)
+GET {{baseUrl}}/contacts/{{contact.response.body.id}}
+
+### ───────── Admin only ─────────
+
+### Login (admin)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@demo.local", "password": "{{password}}" }
+
+### Delete contact (409 ถ้ายังมี lead อ้างอิง)
+DELETE {{baseUrl}}/contacts/{{contact.response.body.id}}
+
+### Delete company (409 ถ้ายังมี contact / lead อ้างอิง)
+DELETE {{baseUrl}}/companies/{{company.response.body.id}}
+
+### Logout
+POST {{baseUrl}}/auth/logout

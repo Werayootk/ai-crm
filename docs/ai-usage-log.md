@@ -157,6 +157,36 @@
 - repo อยู่บน `main` → แยก branch `phase-1-foundation` ก่อน commit (กติกาของ AI: ไม่ commit ตรงเข้า default branch) และจะทำ Phase 2 ต่อบน branch ของตัวเอง
 - **ไม่ commit `docs/assignment.pdf`** เพราะเป็นเอกสารโจทย์ของผู้สรรหา และ remote บน GitHub อาจเป็น public — ใส่ไว้ใน `.gitignore` พร้อมคอมเมนต์ (ลบบรรทัดนั้นได้ถ้าต้องการ commit)
 - ตรวจก่อน commit ว่าไม่มี `.env`, Prisma Client ที่ generate, `dist/`, `.next/` และสแกนหา secret ในไฟล์ที่จะ commit
+- 20:27 commit `8a92fd1` บน branch `phase-1-foundation` (59 ไฟล์, ยังไม่ push)
+
+**Phase 2 — สิ่งที่ AI ทำ (20:28–20:53) บน branch `phase-2-auth-crm-api`**
+
+- ตรวจ library ใหม่ 3 ตัว (`jose`, `cookie`, `express-rate-limit`) ว่า publish มาเกิน 1 วันแล้ว และอ่าน type definition จริงก่อนใช้ — พบว่า `cookie` v2 เปลี่ยนชื่อ `parse` → `parseCookie` และ `express-rate-limit` v8 ต้องใช้ `ipKeyGenerator` เมื่อเขียน keyGenerator เอง
+- ทดสอบพฤติกรรม `bcryptjs` กับรหัสผ่าน > 72 bytes (ภาษาไทย 3 bytes/ตัว) ก่อนออกแบบ validation → ตัดเงียบๆ ไม่ throw จึงไม่ทำให้ login ล่ม
+- สร้าง contract ใน `packages/shared` (input + response schemas) และ API 23 endpoints: auth (login/logout/me), users, companies, contacts, leads (list/search/filter/sort/cursor, pipeline, create, detail, update พร้อม audit, stage change), timeline, activities
+- ออกแบบ `route()` helper ให้ทุก endpoint ต้องประกาศ auth level + zod schema — เพราะ Express 5 ทำให้ `req.query` แก้ไขไม่ได้ (middleware `validate()` แบบเดิมจึงใช้ไม่ได้)
+- ผลการตรวจ: test 106/106 ผ่าน (รวม **core CRM flow** ที่โจทย์บังคับ), lint + typecheck + build ผ่าน; smoke test ผ่าน Next proxy ด้วยข้อมูล seed ครบทุกขั้น (login → อ่าน → สร้าง lead → stage ผิดกติกา 409 → LOST ไม่มีเหตุผล 400 → ย้าย stage → audit → 403 → logout)
+
+**สิ่งที่ตรวจเจอและแก้**
+
+- `pg` เตือน DeprecationWarning ระหว่าง test → ใช้ `--trace-deprecation` หาต้นทาง พบว่าเกิดจากการอ่าน lead detail (relation ซ้อน) ภายใน `$transaction` ทำให้ Prisma ยิง query ขนานบน connection เดียว (จะพังใน pg@9) → ย้ายการอ่านไปหลัง commit แล้ว warning หายไป
+- test ค้นหาด้วยชื่อบริษัทที่ AI เขียนเองคาดผลผิด (คิดว่าค้นจากบริษัทของ contact แต่ระบบค้นจากบริษัทที่ผูกกับ lead ตามที่ออกแบบ) → แก้ test ให้ตรวจแต่ละ field แยกกันชัดเจน
+- smoke test รอบแรกได้ 500 เพราะ script ของ AI รอ health ด้วย `curl -s` ซึ่งผ่านแม้ได้ 500 ขณะ API ยังไม่ขึ้น → เปลี่ยนเป็น `curl -f` แล้วรันใหม่ผ่านทั้งหมด (log ของ API ไม่มี error)
+- smoke test สร้าง lead "[smoke test] Phase 2" ไว้ใน DB dev (ล้างได้ด้วย `pnpm db:seed -- --reset`)
+
+**Human review** — 20:57 ผู้ใช้อนุมัติให้ commit Phase 2 (ดู #6)
+
+---
+
+### #6 · 20:57 — commit Phase 2 และเริ่ม Phase 3
+
+**Prompt** (ตอบคำถาม "commit Phase 2 แล้วเริ่ม Phase 3 เลยไหม")
+
+> ได้
+
+**สิ่งที่ AI ทำ**
+
+- commit Phase 2 บน branch `phase-2-auth-crm-api` แล้วแตก branch `phase-3-web-ui-deploy` ต่อจากนั้น
 
 ---
 

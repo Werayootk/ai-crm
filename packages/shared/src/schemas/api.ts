@@ -8,6 +8,7 @@ export const API_ERROR_CODES = [
   'NOT_FOUND',
   'CONFLICT',
   'PAYLOAD_TOO_LARGE',
+  'RATE_LIMITED',
   'INTERNAL_ERROR',
 ] as const;
 export const apiErrorCodeSchema = z.enum(API_ERROR_CODES);
