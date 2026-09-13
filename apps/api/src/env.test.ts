@@ -16,7 +16,18 @@ describe('parseEnv', () => {
       JWT_SECRET: valid.JWT_SECRET,
       SESSION_TTL_HOURS: 8,
       TRUST_PROXY: 1,
+      AI_MODEL: 'claude-sonnet-5',
+      AI_EFFORT: 'medium',
+      AI_TIMEOUT_MS: 25_000,
+      LINE_MODE: 'mock',
     });
+  });
+
+  it('treats a blank ANTHROPIC_API_KEY as not configured', () => {
+    expect(parseEnv({ ...valid, ANTHROPIC_API_KEY: '  ' }).ANTHROPIC_API_KEY).toBeUndefined();
+    expect(parseEnv({ ...valid, ANTHROPIC_API_KEY: ' FAKE_TEST_VALUE ' }).ANTHROPIC_API_KEY).toBe(
+      'FAKE_TEST_VALUE',
+    );
   });
 
   it('fails fast when required variables are missing', () => {
@@ -30,10 +41,11 @@ describe('parseEnv', () => {
   });
 
   it('rejects a non-postgres DATABASE_URL without echoing its value', () => {
-    const secretish = 'mysql://admin:super-secret-pw@db.internal/crm';
-    const run = () => parseEnv({ ...valid, DATABASE_URL: secretish });
+    // ค่าปลอมสำหรับ test เท่านั้น — ตรวจว่า error ไม่พิมพ์ส่วนที่เป็นรหัสผ่านออกมา
+    const fakeUrl = 'mysql://user:FAKE_TEST_VALUE@localhost/db';
+    const run = () => parseEnv({ ...valid, DATABASE_URL: fakeUrl });
     expect(run).toThrow(/DATABASE_URL: must be a postgres/);
-    expect(run).not.toThrow(/super-secret-pw/);
+    expect(run).not.toThrow(/FAKE_TEST_VALUE/);
   });
 
   it('rejects an invalid PORT', () => {

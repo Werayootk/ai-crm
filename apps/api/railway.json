@@ -3,7 +3,7 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "apps/api/Dockerfile",
-    "watchPatterns": ["apps/api/**", "packages/shared/**", "pnpm-lock.yaml"]
+    "watchPatterns": ["apps/api/**", "packages/shared/**", "skills/**", "pnpm-lock.yaml"]
   },
   "deploy": {
     "preDeployCommand": ["pnpm --filter @ai-crm/api db:deploy"],

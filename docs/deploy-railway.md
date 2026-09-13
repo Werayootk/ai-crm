@@ -39,6 +39,10 @@ browser คุยกับ `web` อย่างเดียว (`/api/*` ถู
      | `PORT` | `4000` (ตายตัว เพื่อให้ `web` อ้างถึงได้) |
      | `TRUST_PROXY` | `2` (Railway edge + Next proxy) |
      | `SESSION_TTL_HOURS` | `8` |
+     | `ANTHROPIC_API_KEY` | key ของ Anthropic (ไม่ใส่ = ใช้กติกาสำรอง ระบบยังทำงานครบ) |
+     | `AI_MODEL` | `claude-sonnet-5` (ไม่ใส่ก็ได้ — เป็นค่า default) |
+     | `AI_EFFORT` / `AI_TIMEOUT_MS` | ไม่ใส่ก็ได้ — default `medium` / `25000` |
+     | `LINE_MODE` | `mock` (Phase 5 เปลี่ยนเป็น `live` พร้อม channel secret/token) |
 
    - Networking → Generate Domain
 4. **Service `web`** → + New → GitHub Repo (repo เดิม) → ชื่อ `web`
@@ -55,12 +59,13 @@ browser คุยกับ `web` อย่างเดียว (`/api/*` ถู
      ```
    - seed ไม่ยอมรันกับ production ถ้าไม่มี `ALLOW_PRODUCTION_SEED=true` และไม่ยอมล้าง DB ที่มีข้อมูลแล้วถ้าไม่มี `-- --reset`
 7. **ตรวจ**
-   - `curl https://<api-domain>/api/health` → `{"status":"ok","db":"up",...}`
+   - `curl https://<api-domain>/api/health` → `{"status":"ok","db":"up","ai":"claude","line":"mock"}` (`ai` เป็น `fallback` ถ้าไม่ได้ใส่ key)
    - เปิด web URL → login ด้วยบัญชี demo → ย้าย stage ของ lead → Railway: Restart ทั้ง `web` และ `api` → refresh → ข้อมูลยังอยู่
+   - หน้า lead → **ขอคำแนะนำจาก AI** → การ์ดต้องบอกชื่อ model และเวลาที่ใช้ (ถ้าขึ้น "กติกาสำรอง" ให้ดูเหตุผลบนการ์ด และดู log ของ `api` ที่ข้อความ `ai suggestions generated`)
 
 ## หลังจากนั้น
 
-- Railway deploy ใหม่เองเมื่อ push เข้า branch ที่ผูกไว้ — `watchPatterns` ใน `railway.json` ทำให้แก้ `apps/web` ไม่ trigger `api` (และกลับกัน)
+- Railway deploy ใหม่เองเมื่อ push เข้า branch ที่ผูกไว้ — `watchPatterns` ใน `railway.json` ทำให้แก้ `apps/web` ไม่ trigger `api` (และกลับกัน); แก้ `skills/` trigger เฉพาะ `api`
 - เปลี่ยนชื่อ service `api` หรือ `PORT` → ต้อง redeploy `web` ด้วย (เพราะ `API_URL` อยู่ใน build)
 - secret ทั้งหมด (`JWT_SECRET`, LINE channel secret/token, `ANTHROPIC_API_KEY` ใน Phase 4–5) ใส่ใน Railway Variables เท่านั้น ห้าม commit
 

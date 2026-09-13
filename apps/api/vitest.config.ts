@@ -9,6 +9,7 @@ export default defineProject({
     name: 'api',
     include: ['src/**/*.test.ts'],
     globalSetup: ['./test/global-setup.ts'],
+    setupFiles: ['./test/setup.ts'],
     // test ใช้ DB จริงตัวเดียวกัน — รันทีละไฟล์เพื่อไม่ให้ข้อมูลชนกัน
     fileParallelism: false,
   },

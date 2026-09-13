@@ -11,7 +11,7 @@ import { createTestApp, createUser, loginAs } from '../../../test/helpers';
 import { createTestPrisma, truncateAll } from '../../../test/test-db';
 
 const prisma = createTestPrisma();
-const app = createTestApp(prisma);
+const app = await createTestApp(prisma);
 const contactPageSchema = pageSchema(contactSchema);
 let sales: AuthUser;
 let admin: AuthUser;

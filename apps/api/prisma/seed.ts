@@ -201,8 +201,9 @@ function scoreFor(stage: LeadStage): number | null {
   }
 }
 
+/** ต่อท้าย "สร้าง lead จาก" — คำภาษาอังกฤษต้องมีวรรคนำหน้า */
 function sourceLabel(source: LeadSource): string {
-  return { WEBSITE: 'ฟอร์มหน้าเว็บไซต์', MANUAL: 'การบันทึกโดยทีมขาย', LINE: 'LINE OA' }[source];
+  return { WEBSITE: 'ฟอร์มหน้าเว็บไซต์', MANUAL: 'การบันทึกโดยทีมขาย', LINE: ' LINE OA' }[source];
 }
 
 async function insertInChunks<T>(

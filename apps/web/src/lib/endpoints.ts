@@ -1,5 +1,8 @@
 import type {
   activityCreateInputSchema,
+  AiSuggestionApproveInput,
+  AiSuggestionRejectInput,
+  AiSuggestionStatus,
   companyCreateInputSchema,
   companyUpdateInputSchema,
   contactCreateInputSchema,
@@ -11,6 +14,8 @@ import type {
 } from '@ai-crm/shared';
 import {
   activitySchema,
+  aiSuggestionDecisionSchema,
+  aiSuggestionListSchema,
   authResponseSchema,
   companyDetailSchema,
   companySchema,
@@ -60,6 +65,17 @@ export const api = {
   },
   activities: {
     complete: (id: string) => apiSend(activitySchema, 'PATCH', `/activities/${id}/complete`),
+  },
+  ai: {
+    /** ขอคำแนะนำใหม่ — อาจใช้เวลาหลายวินาที (ตามเวลาตอบของ AI) */
+    ask: (leadId: string) =>
+      apiSend(aiSuggestionListSchema, 'POST', `/leads/${leadId}/ai-suggestions`),
+    list: (leadId: string, status?: AiSuggestionStatus) =>
+      apiGet(aiSuggestionListSchema, `/leads/${leadId}/ai-suggestions`, { status }),
+    approve: (id: string, body: AiSuggestionApproveInput) =>
+      apiSend(aiSuggestionDecisionSchema, 'POST', `/ai-suggestions/${id}/approve`, body),
+    reject: (id: string, body: AiSuggestionRejectInput) =>
+      apiSend(aiSuggestionDecisionSchema, 'POST', `/ai-suggestions/${id}/reject`, body),
   },
   companies: {
     list: (query: Query) => apiGet(companyPageSchema, '/companies', query),

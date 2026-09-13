@@ -1,9 +1,11 @@
+import { createServer, type Server } from 'node:http';
 import type { AuthUser } from '@ai-crm/shared';
 import bcrypt from 'bcryptjs';
 import { pino } from 'pino';
 import request from 'supertest';
-import { createApp, type AppConfig } from '../src/app';
+import { createApp, type AppConfig, type AppDeps } from '../src/app';
 import type { PrismaClient, UserRole } from '../src/generated/prisma/client';
+import { createMockLineClient } from '../src/modules/line/mock-line-client';
 
 export const silentLogger = pino({ level: 'silent' });
 
@@ -16,11 +18,56 @@ export const testConfig: AppConfig = {
     secureCookies: false,
   },
   loginRateLimit: { windowMs: 60_000, limit: 1_000 },
+  aiRateLimit: { windowMs: 60_000, limit: 1_000 },
   trustProxy: 0,
 };
 
-export function createTestApp(prisma: PrismaClient, config: Partial<AppConfig> = {}) {
-  return createApp({ prisma, logger: silentLogger, config: { ...testConfig, ...config } });
+export type TestApp = Server;
+
+const openServers = new Set<Server>();
+
+/**
+ * app ของ test ที่ listen บน 127.0.0.1 แล้ว — supertest จะใช้พอร์ตนี้แทนการ listen(0) เอง
+ * เพราะ listen(0) ของ supertest จับ `::` ซึ่งบน macOS อาจได้พอร์ตซ้ำกับโปรแกรมอื่นที่จับ 127.0.0.1 อยู่
+ * แล้ว supertest ต่อ 127.0.0.1 ไปเจอโปรแกรมนั้น → test ล้มแบบสุ่มด้วย "Parse Error: Expected HTTP/"
+ *
+ * default: ไม่มี AI provider (ใช้กติกาสำรอง), LINE จำลอง, retry ไม่รอ
+ */
+export async function createTestApp(
+  prisma: PrismaClient,
+  overrides: Partial<AppConfig> & Partial<Pick<AppDeps, 'copilot' | 'line'>> = {},
+): Promise<TestApp> {
+  const { copilot, line, ...config } = overrides;
+  const app = createApp({
+    prisma,
+    logger: silentLogger,
+    config: { ...testConfig, ...config },
+    copilot: copilot ?? { provider: null, timeoutMs: 1_000 },
+    line: line ?? createMockLineClient(),
+    lineRetryDelaysMs: [0, 0],
+  });
+  const server = createServer(app);
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  openServers.add(server);
+  return server;
+}
+
+/** เรียกจาก test/setup.ts หลังจบแต่ละไฟล์ */
+export async function closeTestServers(): Promise<void> {
+  const servers = [...openServers];
+  openServers.clear();
+  await Promise.all(
+    servers.map(
+      (server) =>
+        new Promise<void>((resolve) => {
+          server.closeAllConnections();
+          server.close(() => resolve());
+        }),
+    ),
+  );
 }
 
 // cost 4 = ต่ำสุดของ bcrypt ให้ test เร็ว (production/seed ใช้ 10)
@@ -46,7 +93,7 @@ export async function createUser(
 }
 
 /** supertest agent ที่ login แล้ว (เก็บ session cookie ไว้ใช้ request ต่อไป) */
-export async function loginAs(app: ReturnType<typeof createTestApp>, user: AuthUser) {
+export async function loginAs(app: TestApp, user: AuthUser) {
   const agent = request.agent(app);
   const res = await agent
     .post('/api/auth/login')

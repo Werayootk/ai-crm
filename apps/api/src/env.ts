@@ -9,6 +9,19 @@ const envSchema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(8),
   /** จำนวน proxy ที่อยู่หน้า API (local ผ่าน Next = 1, Railway ผ่าน edge + Next = 2) */
   TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
+
+  // ---- AI (crm-copilot) — ไม่มี key = ใช้กติกาสำรองอย่างเดียว ----
+  ANTHROPIC_API_KEY: z
+    .string()
+    .trim()
+    .transform((value) => (value === '' ? undefined : value))
+    .optional(),
+  AI_MODEL: z.string().min(1).default('claude-sonnet-5'),
+  AI_EFFORT: z.enum(['low', 'medium', 'high']).default('medium'),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(25_000),
+
+  // ---- LINE — mock = ไม่ส่งจริง (เก็บในหน่วยความจำ) ----
+  LINE_MODE: z.enum(['mock', 'live']).default('mock'),
 });
 
 export type Env = z.infer<typeof envSchema>;

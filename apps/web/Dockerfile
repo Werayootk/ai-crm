@@ -8,6 +8,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json apps/web/
 COPY apps/api/package.json apps/api/
 COPY packages/shared/package.json packages/shared/
+COPY skills/crm-copilot/package.json skills/crm-copilot/
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
     pnpm install --frozen-lockfile --filter @ai-crm/web...

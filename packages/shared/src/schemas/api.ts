@@ -27,6 +27,10 @@ export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
 export const healthResponseSchema = z.object({
   status: z.enum(['ok', 'degraded']),
   db: z.enum(['up', 'down']),
+  /** 'claude' = มี API key, 'fallback' = ใช้กติกาสำรองอย่างเดียว */
+  ai: z.enum(['claude', 'fallback']),
+  /** 'live' = ส่งผ่าน LINE Messaging API จริง, 'mock' = จำลองในหน่วยความจำ */
+  line: z.enum(['live', 'mock']),
   uptimeSec: z.number().int().nonnegative(),
   time: z.iso.datetime(),
 });

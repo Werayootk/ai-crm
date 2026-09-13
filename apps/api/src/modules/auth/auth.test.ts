@@ -18,7 +18,7 @@ import { createTestPrisma, truncateAll } from '../../../test/test-db';
 import { SESSION_COOKIE, signSessionToken } from './session';
 
 const prisma = createTestPrisma();
-const app = createTestApp(prisma);
+const app = await createTestApp(prisma);
 let sales: AuthUser;
 let inactive: AuthUser;
 
@@ -87,7 +87,7 @@ describe('POST /api/auth/login', () => {
   });
 
   it('rate limits repeated failed attempts per IP and email', async () => {
-    const limited = createTestApp(prisma, {
+    const limited = await createTestApp(prisma, {
       loginRateLimit: { windowMs: 60_000, limit: 3 },
     });
     const attempt = (email: string) =>

@@ -49,7 +49,28 @@ const FIELD_LABEL: Record<string, string> = {
   value: 'มูลค่าดีล',
 };
 
+const aiDecisionMeta = z.object({
+  source: z.enum(['LLM', 'FALLBACK']).optional(),
+  edited: z.boolean().optional(),
+});
+
 type ActivityItem = Extract<TimelineItem, { kind: 'activity' }>;
+
+/** บอกว่าคำแนะนำที่อนุมัติมาจาก AI หรือกติกาสำรอง และคนแก้ก่อนอนุมัติหรือไม่ */
+function AiDecisionNote({ metadata }: { metadata: ActivityItem['metadata'] }) {
+  const parsed = aiDecisionMeta.safeParse(metadata);
+  if (!parsed.success) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1.5">
+      {parsed.data.source === 'FALLBACK' ? (
+        <Badge className="bg-amber-50 text-amber-800 ring-amber-200">กติกาสำรอง</Badge>
+      ) : (
+        <Badge className="bg-indigo-50 text-indigo-700 ring-indigo-200">AI</Badge>
+      )}
+      {parsed.data.edited ? <Badge>แก้ไขก่อนอนุมัติ</Badge> : null}
+    </div>
+  );
+}
 type MessageItem = Extract<TimelineItem, { kind: 'message' }>;
 
 function FieldChanges({ metadata }: { metadata: ActivityItem['metadata'] }) {
@@ -112,7 +133,10 @@ function ActivityEntry({ item, leadId }: { item: ActivityItem; leadId: string })
       {item.body ? (
         <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{item.body}</p>
       ) : null}
-      {item.type === 'SYSTEM' ? <FieldChanges metadata={item.metadata} /> : null}
+      {item.type === 'SYSTEM' || item.type === 'AI_APPROVED' ? (
+        <FieldChanges metadata={item.metadata} />
+      ) : null}
+      {item.type === 'AI_APPROVED' ? <AiDecisionNote metadata={item.metadata} /> : null}
       {item.type === 'TASK' ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
           {item.dueAt ? <Badge>กำหนด {formatDateTime(item.dueAt)}</Badge> : null}

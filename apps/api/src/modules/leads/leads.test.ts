@@ -16,7 +16,7 @@ import { createTestPrisma, truncateAll } from '../../../test/test-db';
 import { auditedChanges } from './leads.service';
 
 const prisma = createTestPrisma();
-const app = createTestApp(prisma);
+const app = await createTestApp(prisma);
 const leadPageSchema = pageSchema(leadListItemSchema);
 let sales: AuthUser;
 let otherSales: AuthUser;

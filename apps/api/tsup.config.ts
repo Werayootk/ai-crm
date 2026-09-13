@@ -8,6 +8,6 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   sourcemap: true,
-  // shared export เป็น TypeScript source → ต้อง bundle เข้าไป; dependencies อื่นเป็น external
-  noExternal: ['@ai-crm/shared'],
+  // workspace package export เป็น TypeScript source → ต้อง bundle เข้าไป; dependencies อื่นเป็น external
+  noExternal: ['@ai-crm/shared', '@ai-crm/crm-copilot'],
 });

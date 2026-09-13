@@ -2,7 +2,7 @@
 
 คู่มือสำหรับ Claude Code ในโปรเจกต์ **ai-crm** — อ่านให้ครบก่อนเริ่มงานทุกครั้ง
 
-> **สถานะปัจจุบัน:** Phase 1–3 เสร็จ (foundation, auth + CRM API, web UI + ไฟล์ deploy) — ขั้นตอน deploy บน Railway ต้องใช้บัญชีผู้ใช้ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ถัดไป Phase 4 (AI Copilot)
+> **สถานะปัจจุบัน:** Phase 1–4 เสร็จ (foundation, auth + CRM API, web UI + ไฟล์ deploy, AI Copilot + approval flow) — ขั้นตอน deploy บน Railway ต้องใช้บัญชีผู้ใช้ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ถัดไป Phase 5 (LINE OA)
 > แผน: [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) · โจทย์: [docs/assignment.pdf](docs/assignment.pdf) (หน้า 1–3 JD, หน้า 4–5 โจทย์)
 
 ## คำสั่งที่ใช้บ่อย (รันที่ root)
@@ -15,8 +15,9 @@ pnpm db:deploy      # apply migrations ที่ยังไม่ได้ล�
 pnpm db:migrate     # dev: สร้าง migration ใหม่จาก schema + apply + generate
 pnpm db:seed        # ข้อมูลสังเคราะห์ — DB ที่มีข้อมูลแล้วต้องใช้ `pnpm db:seed -- --reset` (ล้างข้อมูลเดิมทั้งหมด)
 pnpm dev            # web http://localhost:3000 + api http://localhost:4000
-pnpm test           # vitest (packages/shared + apps/api กับ DB ai_crm_test)
+pnpm test           # vitest (shared, crm-copilot, api กับ DB ai_crm_test, web)
 pnpm lint && pnpm typecheck && pnpm build
+pnpm --filter @ai-crm/crm-copilot eval   # eval 7 เคสของ skill (ใช้ Claude ถ้ามี ANTHROPIC_API_KEY ใน apps/api/.env ไม่งั้นทดสอบกติกาสำรอง)
 
 # production image ทั้งชุดในเครื่อง (จำลอง Railway) — web ที่ http://localhost:3100
 JWT_SECRET=$(openssl rand -base64 48) docker compose -f docker-compose.prod.yml up --build
@@ -43,7 +44,16 @@ env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `a
 - กันการเขียนทับกัน: ใช้ `updateMany({ where: { id, <สถานะเดิม> } })` แล้วเช็ค `count` (เช่น stage change) — approve AI suggestion ใน Phase 4 ใช้แบบเดียวกัน
 - `$transaction` เก็บแค่การเขียนที่ต้อง atomic แล้วอ่านข้อมูลที่จะตอบกลับหลัง commit (อ่าน relation ซ้อนใน transaction ทำให้ `pg` เตือนและจะพังใน pg@9)
 - event สำคัญทางธุรกิจ log ด้วย `req.log.info({ ...ids }, 'message')`; activity ประเภท STAGE_CHANGE / SYSTEM / AI_* ระบบสร้างเท่านั้น
-- test: supertest + DB `ai_crm_test`, ใช้ `createTestApp`, `createUser`, `loginAs` ใน `apps/api/test/helpers.ts` และ fixture ใน `apps/api/test/fixtures.ts`
+- test: supertest + DB `ai_crm_test`, ใช้ `await createTestApp(prisma)`, `createUser`, `loginAs` ใน `apps/api/test/helpers.ts` และ fixture ใน `apps/api/test/fixtures.ts` — ห้ามส่ง Express app ให้ supertest ตรงๆ (มันจะ listen บน `::` ซึ่งบน macOS ชนพอร์ตกับโปรแกรมอื่นแล้วล้มแบบสุ่ม — `createTestApp` listen บน `127.0.0.1` ให้แล้ว)
+
+## แนวทางฝั่ง AI (ใช้ตั้งแต่ Phase 4)
+
+- `skills/crm-copilot` เป็น pure package: รับ `CopilotInput` คืน `CopilotResult` — ห้าม import Prisma/Express/LINE ในนั้น; เรียก Claude ผ่าน `@anthropic-ai/sdk` `messages.parse()` + `zodOutputFormat(copilotOutputSchema)` เท่านั้น
+- `runCrmCopilot` ไม่ throw (ยกเว้น input ผิด shape): ไม่มี key / timeout / API error / refusal / output ไม่ผ่าน schema → กติกาสำรอง (`source: 'FALLBACK'` + `fallbackReason`) และทุก output ผ่าน `applyGuardrails` เสมอ
+- แก้ prompt หรือ guardrail แล้วต้องเพิ่ม `PROMPT_VERSION` และรัน `pnpm --filter @ai-crm/crm-copilot eval` — เคสใหม่เพิ่มใน `evals/cases.ts` และตาราง eval ใน `SKILL.md`
+- ข้อมูลที่ส่งให้ AI สร้างใน `apps/api/src/modules/ai/context.ts` เท่านั้น — ห้ามส่ง email/phone/lineUserId
+- output ของ AI ลงตาราง `AiSuggestion` สถานะ PENDING เท่านั้น; การเขียนจริงอยู่ใน `approveSuggestion` (claim ด้วย `updateMany` → side effect + activity `AI_APPROVED` ใน transaction เดียว → ส่ง LINE หลัง commit) และ field ที่แก้ได้ต่อ type กำหนดใน `APPROVE_FIELDS` ของ shared
+- env: `ANTHROPIC_API_KEY` (ว่าง = กติกาสำรอง), `AI_MODEL` (default `claude-sonnet-5`), `AI_EFFORT`, `AI_TIMEOUT_MS`, `LINE_MODE` — `/api/health` บอกโหมด `ai: claude|fallback`, `line: live|mock`
 
 ## ข้อควรรู้ของ stack (ตรวจแล้วตอน Phase 1)
 
@@ -134,7 +144,7 @@ apps/
 packages/
   shared/     zod schemas + TypeScript types + กติกา business ที่ใช้ร่วมกัน (เช่น stage transition)
 skills/
-  crm-copilot/  workspace package (Phase 4): SKILL.md + prompt + runtime + evals — depend แค่ shared ห้าม depend on Prisma
+  crm-copilot/  workspace package: SKILL.md + prompt + runtime (Claude/mock provider, guardrails, กติกาสำรอง) + evals — depend แค่ shared ห้าม depend on Prisma
 docker/       init script ของ Postgres สำหรับ local
 docs/         โจทย์ แผน (docs/plans/) และ AI-usage log
 ```

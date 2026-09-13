@@ -8,3 +8,4 @@ export * from './schemas/contact';
 export * from './schemas/lead';
 export * from './schemas/timeline';
 export * from './schemas/details';
+export * from './schemas/ai';

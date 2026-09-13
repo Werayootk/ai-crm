@@ -234,7 +234,29 @@
 
 **สิ่งที่ AI ทำ**
 
-- commit Phase 3 บน branch `phase-3-web-ui-deploy` (ไม่ push)
+- 22:13 commit Phase 3 (`f440183`) บน branch `phase-3-web-ui-deploy` (ไม่ push) แล้วถามวิธี commit ของ phase ที่เหลือ → ผู้ใช้เลือก **"commit ทีละ phase เอง"** (branch ต่อ phase, commit ในเครื่อง ไม่ push)
+
+**Phase 4 — สิ่งที่ AI ทำ (22:17–23:05)** บน branch `phase-4-ai-copilot`
+
+- 22:17–22:18 **ตรวจ SDK จากซอร์สใน `node_modules` แทนการเดา**: `@anthropic-ai/sdk` 0.125.0 (publish เกิน 1 วันตามกติกา pnpm), `client.messages.parse()` + `zodOutputFormat()` จาก `@anthropic-ai/sdk/helpers/zod`, พฤติกรรมเมื่อ output ไม่ตรง schema (throw `AnthropicError`), class ของ error (`APIUserAbortError`, `APIConnectionTimeoutError`, `APIError`) และ `output_config: { format, effort }` — ใช้ข้อมูลนี้ออกแบบการแยกเหตุผลของ fallback
+- 22:20–22:27 schema ของ AI ใน `packages/shared` + package `skills/crm-copilot`: prompt, Claude provider, mock provider, guardrails, กติกาสำรอง, `runCrmCopilot` (ไม่ throw, มี timeout) และ eval 7 เคส + CLI (`pnpm --filter @ai-crm/crm-copilot eval`) → รันกับกติกาสำรองผ่าน 7/7
+- 22:29 [skills/crm-copilot/SKILL.md](../skills/crm-copilot/SKILL.md) (purpose, inputs, outputs, allowed actions, guardrails, failure behavior, eval 7 เคส) + env ของ AI + Dockerfile คัดลอก skill เข้า image
+- 22:30–22:34 API: `LineClient` + mock + การส่งซ้ำด้วย `retryKey` เดิม, context builder (ไม่ส่ง email/phone/lineUserId ให้ AI), service ขอ/อนุมัติ/ไม่ใช้ suggestion, endpoints 4 ตัว, `/api/health` บอกโหมด AI/LINE และ **test ที่โจทย์บังคับ #2** (11 test: fallback ทุกเหตุผล, ไม่มีข้อมูลเปลี่ยนก่อนอนุมัติ, อนุมัติซ้ำได้ 409, ส่ง LINE ครั้งเดียว, LINE ล่มแล้วข้อความเป็น FAILED, supersede, field ที่แก้ไม่ได้ได้ 400)
+- 22:36–22:37 เว็บ: แผง AI Copilot ในหน้า lead (การ์ด "รออนุมัติ — ยังไม่ถูกบันทึก", แก้ไขก่อนอนุมัติ, ป้าย "กติกาสำรอง" พร้อมเหตุผล, คำเตือนจาก guardrail) และ timeline แสดงว่าอนุมัติจาก AI หรือกติกาสำรอง และแก้ไขก่อนอนุมัติหรือไม่
+- 22:49 **ตรวจใน Chrome จริง** (`playwright-core`): health `{"ai":"fallback","line":"mock"}` → ขอคำแนะนำได้ 3 การ์ด → แก้คะแนนเป็น 55 แล้วอนุมัติ (timeline: "คะแนน: — → 55 · กติกาสำรอง · แก้ไขก่อนอนุมัติ") → สร้างงาน → แก้ข้อความแล้วส่ง LINE จำลอง ("ส่งแล้ว · ร่างโดย AI") → ไม่ใช้พร้อมเหตุผล → มือถือ; ไม่มี console error
+- 22:50–22:54 build image ของ api ใหม่ ยืนยันว่ามี `skills/crm-copilot` อยู่ใน image
+- ผลการตรวจ: test 160/160 (15 ไฟล์) ผ่าน 5 รอบติด, lint + typecheck + build ผ่าน
+
+**สิ่งที่ AI ตรวจเจอเองแล้วแก้**
+
+- IDE เตือนว่าค่าปลอมใน `env.test.ts` หน้าตาเหมือน credential → เปลี่ยนเป็น `FAKE_TEST_VALUE` ให้เห็นชัดว่าไม่ใช่ secret
+- seed เขียน "สร้าง lead จากLINE OA" (ไม่มีวรรคหน้าคำอังกฤษ) → แก้ข้อความ
+- `watchPatterns` ของ api ไม่มี `skills/**` → แก้ prompt บน Railway แล้วจะไม่ deploy ใหม่ → เพิ่มแล้ว
+- **test ล้มแบบสุ่ม — AI เดาสาเหตุผิดในรอบแรก**: 22:39 test health ล้ม 2 ครั้งแต่ AI กรอง log ด้วย `grep` จนข้อความ error หาย; รันซ้ำ 18 รอบ + รันใต้ CPU load ก็ไม่ล้ม จึงเดาว่า DB ตอบช้าแล้วเพิ่ม `testTimeout` (ไม่ใส่ retry เพราะจะกลบ test ที่พังจริง) และเปลี่ยนมาเก็บ log เต็ม → 22:56 ล้มอีกครั้ง คราวนี้เห็น error จริง `Parse Error: Expected HTTP/` → อ่านซอร์ส supertest พบว่ามัน listen บน `::` แต่ต่อ `127.0.0.1` และ `lsof` เห็นโปรแกรมอื่นในเครื่อง (VS Code, java, LINE) จับพอร์ตสุ่มบน `127.0.0.1` อยู่ → เขียน script 15 บรรทัดจำลองได้ error เดียวกันเป๊ะ → แก้ให้ `createTestApp` listen บน `127.0.0.1` เอง (OS ไม่ยอมให้ซ้ำพอร์ต — ยืนยันด้วย `EADDRINUSE`) และ**ถอด `testTimeout` ที่เพิ่มจากการเดาผิดออก**
+
+**ยังไม่ได้ทำ** — รัน eval กับ Claude จริง: เครื่องนี้ไม่มี `ANTHROPIC_API_KEY` (ผู้ใช้ใส่เองใน `apps/api/.env` แล้วรัน `pnpm --filter @ai-crm/crm-copilot eval`)
+
+**Human review** — Phase 4 commit ตามที่ผู้ใช้สั่ง (22:11, "commit ทีละ phase เอง") รอผู้ใช้ review บน branch
 
 ---
 
@@ -244,3 +266,4 @@
 |---|---|---|---|
 | 2026-09-13 19:17 | ออกจาก plan mode แล้วพร้อมเริ่ม implement ตามแผน | **Reject** | ยังไม่เริ่มโค้ด; เก็บแผนไว้ใน `docs/plans/`, เริ่ม AI-usage log นี้ และเพิ่มกติกาใน `CLAUDE.md` ให้ทุก session บันทึกต่อ |
 | 2026-09-13 19:33 | AI model `claude-opus-5` | **เปลี่ยน** เป็น `claude-sonnet-5` | ค่า default ของ `AI_MODEL` และตัวอย่างใน schema เปลี่ยนตาม; ยืนยัน Railway และ JWT cookie ตามที่เสนอ |
+| 2026-09-13 22:13 | ถามวิธี commit Phase 4–6 (ทีละ phase / รวดเดียวตอนจบ) | **เลือก** commit ทีละ phase | แต่ละ phase อยู่บน branch ของตัวเองและ commit ในเครื่องทันทีที่เสร็จ ไม่ push |

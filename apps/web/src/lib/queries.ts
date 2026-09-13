@@ -12,6 +12,8 @@ export const queryKeys = {
   pipeline: (ownerId: string) => ['leads', 'pipeline', ownerId] as const,
   lead: (id: string) => ['lead', id] as const,
   timeline: (id: string) => ['lead', id, 'timeline'] as const,
+  /** อยู่ใต้ ['lead', id] → invalidate lead แล้ว refresh คำแนะนำด้วย */
+  suggestions: (id: string) => ['lead', id, 'suggestions'] as const,
   companies: ['companies'] as const,
   company: (id: string) => ['company', id] as const,
   contacts: ['contacts'] as const,
