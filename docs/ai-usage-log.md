@@ -8,6 +8,14 @@
 
 รูปแบบของแต่ละ entry: วันเวลา · prompt ต้นฉบับ · สิ่งที่ AI ทำ · ผลลัพธ์ · สิ่งที่คน review หรือตัดสินใจ
 
+## สรุปสั้น (สำหรับผู้ประเมิน)
+
+- **ตัวอย่าง task / prompt**: อ่านโจทย์แล้วเขียนกติกา repo (#1), วางแผน schema / endpoint / 6 phase ใน plan mode (#2), "commit Phase 3 … ทำ Phase 4 - จบ … เขียน step deploy" (#8)
+- **สิ่งที่คน review / reject**: reject การเริ่มโค้ดทันทีหลังวางแผน (19:17), เปลี่ยน model จาก `claude-opus-5` ที่ AI เสนอเป็น `claude-sonnet-5` (19:33), เลือกให้ commit ทีละ phase บน branch ของตัวเอง (22:13) — ตารางท้ายไฟล์
+- **การเปลี่ยนแปลงสำคัญจาก human inspection**: การ reject ตอน 19:17 เปลี่ยนวิธีทำงานทั้งโปรเจกต์ — แผนต้องเก็บใน `docs/plans/` ก่อนเขียนโค้ด, ทุก session ต้องบันทึก log นี้ด้วยเวลาจริง และทุก phase ต้องบันทึก "สิ่งที่ต่างจากแผน" → ผู้ประเมินตรวจย้อนได้ว่าอะไรเปลี่ยนเพราะอะไร
+- **AI ตรวจงานตัวเองอย่างไร** (ไม่ได้แทน human review): อ่านซอร์ส / สเปกทางการของ SDK และ LINE ก่อนเขียน, ตรวจทุกหน้าใน Chrome จริง (เจอ bug ที่ test ไม่จับหลายจุด เช่น logout redirect ซ้อน, ลำดับ timeline ของ LINE), หาต้นเหตุ test ล้มแบบสุ่มจนเจอเรื่องพอร์ตชนบน macOS แทนการใส่ retry, mutation test ยืนยันว่า test ความปลอดภัยจับ bug ได้จริง
+- **ยังรอ**: ผู้ใช้ review โค้ดของ Phase 4–6 บน branch และ deploy / ตั้งค่า LINE OA จริงด้วยบัญชีของตัวเอง
+
 ---
 
 ## Session 1 — 2026-09-13
@@ -298,6 +306,23 @@
 **ยังไม่ได้ทำ (ต้องใช้บัญชีของผู้ใช้)** — สร้าง LINE OA จริง, ใส่ channel secret / token ใน Railway, ทดสอบจากมือถือ
 
 **Human review** — Phase 5 commit ตามคำสั่ง #8 ("commit ทีละ phase เอง") รอผู้ใช้ review บน branch
+
+**Phase 5 commit** — 03:26 `dc55ceb` บน branch `phase-5-line-oa` แล้วแตก branch `phase-6-hardening-handover` ต่อ
+
+**Phase 6 — สิ่งที่ AI ทำ (03:26–03:50)**
+
+- 03:26–03:27 `pnpm audit --prod` เจอ 3 รายการ (high 2) → ไล่ path พบว่าทั้งหมดอยู่ใน Prisma CLI และ Prisma 7.10.0 (ล่าสุดของ 7.x) pin เวอร์ชันนั้นไว้เอง → **ตัดสินใจไม่ override** dependency ภายในของ Prisma (เสี่ยงทำ migrate พัง, โค้ดส่วนนั้นไม่รับ input จากภายนอก) แต่บันทึกเป็นความเสี่ยงที่ยอมรับพร้อมเหตุผลใน README — **ผู้ใช้ควรตรวจการตัดสินใจนี้**
+- 03:27–03:28 helmet 8.3.0 (ตรวจอายุ release) ให้ API; อ่านเอกสาร Next 16 ใน `node_modules` แล้วตั้ง CSP / HSTS / X-Frame-Options ฯลฯ ให้เว็บ — ตัด `upgrade-insecure-requests` ออกจากตัวอย่างในเอกสาร เพราะจะทำให้ production stack ในเครื่อง (http) พัง
+- 03:29–03:33 ฟอร์ม "ติดต่อเรา" `/contact-us` + `POST /api/public/leads` (rate limit ต่อ IP, honeypot, consent ตาม PDPA, ไม่เขียนทับ contact เดิมจาก input สาธารณะ, ไม่บอกว่าอีเมลมีในระบบไหม) และ `GET /api/ops/summary` (admin) สำหรับ monitor + test
+- 03:34–03:38 **ตรวจบน production image** (docker compose): header ครบทั้ง web / api, ฟอร์มสาธารณะส่งได้และ lead ขึ้นในระบบ, ทุกหน้าไม่มี CSP violation, สคริปต์ตรวจของ Phase 3–4 ผ่านซ้ำ, **LINE webhook ผ่าน rewrite ของเว็บได้** (ลายเซ็นตรง) → เปลี่ยนคำแนะนำ deploy ให้ `api` ไม่ต้องมี public domain เลย (ลดพื้นผิวการโจมตี และแก้ข้อจำกัดเรื่อง IP ปลอมที่บันทึกไว้ใน Phase 3)
+- 03:38–03:39 สแกนประวัติ git ทั้ง 6 commit หา secret: เจอ 3 จุดแต่เป็นค่าตัวอย่างทั้งหมด, ไม่เคย commit `.env` / PDF
+- 03:39–03:46 [monitoring.md](monitoring.md) (ดึงรายชื่อ log จากโค้ดจริง), [deploy-railway.md](deploy-railway.md) ฉบับสุดท้าย (push ขึ้น GitHub, Railway, smoke test, LINE OA, รายการส่งงาน), README ฉบับเต็ม (ตรวจ endpoint / query / cookie ที่อ้างถึงกับโค้ดแล้ว)
+
+**สิ่งที่ AI ตรวจเจอเองแล้วแก้** — ช่องในฟอร์มสาธารณะที่กรอกผิดไม่มี `aria-invalid` (กรอบไม่แดง, screen reader ไม่รู้) → เพิ่มทุกช่อง; คำสั่ง `docker compose logs` ต้องมี `JWT_SECRET` ตอนอ่านไฟล์ → ระบุไว้ในเอกสาร
+
+**ยังไม่ได้ทำ (ต้องใช้บัญชี / คนทำ)** — push ขึ้น GitHub, deploy บน Railway, ตั้งค่า LINE OA จริง + QR, อัดวิดีโอ walkthrough
+
+**Human review** — Phase 6 commit ตามคำสั่ง #8 รอผู้ใช้ review ทั้ง 6 branch ก่อน merge เข้า `main` และ push
 
 ---
 

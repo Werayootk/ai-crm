@@ -22,6 +22,14 @@ describe('GET /api/health', () => {
     // test app: ไม่มี AI key + LINE จำลอง
     expect(body).toMatchObject({ status: 'ok', db: 'up', ai: 'fallback', line: 'mock' });
     expect(res.headers['x-request-id']).toBeTruthy();
+    // security headers จาก helmet และไม่เปิด CORS
+    expect(res.headers).toMatchObject({
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'SAMEORIGIN',
+    });
+    expect(res.headers['strict-transport-security']).toMatch(/max-age=/);
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    expect(res.headers['x-powered-by']).toBeUndefined();
   });
 
   it('reports degraded with 503 when the database is down', async () => {

@@ -61,6 +61,7 @@ const app = createApp({
     },
     loginRateLimit: { windowMs: 15 * 60_000, limit: 10 },
     aiRateLimit: { windowMs: 60_000, limit: 20 },
+    publicRateLimit: { windowMs: 10 * 60_000, limit: 5 },
     trustProxy: env.TRUST_PROXY,
   },
   copilot,

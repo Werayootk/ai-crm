@@ -12,6 +12,7 @@ import type {
   leadUpdateInputSchema,
   loginInputSchema,
   MessageCreateInput,
+  PublicLeadInput,
 } from '@ai-crm/shared';
 import {
   activitySchema,
@@ -27,6 +28,7 @@ import {
   leadListItemSchema,
   messageSchema,
   pageSchema,
+  publicLeadResponseSchema,
   pipelineSummarySchema,
   timelinePageSchema,
   userListResponseSchema,
@@ -43,6 +45,9 @@ type Input<S extends z.ZodType> = z.input<S>;
 
 export const api = {
   health: () => apiGet(healthResponseSchema, '/health'),
+  /** ฟอร์ม "ติดต่อเรา" สาธารณะ — ไม่ต้อง login */
+  submitPublicLead: (body: PublicLeadInput) =>
+    apiSend(publicLeadResponseSchema, 'POST', '/public/leads', body),
   auth: {
     me: () => apiGet(authResponseSchema, '/auth/me'),
     login: (body: Input<typeof loginInputSchema>) =>

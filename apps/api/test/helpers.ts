@@ -22,6 +22,7 @@ export const testConfig: AppConfig = {
   },
   loginRateLimit: { windowMs: 60_000, limit: 1_000 },
   aiRateLimit: { windowMs: 60_000, limit: 1_000 },
+  publicRateLimit: { windowMs: 60_000, limit: 1_000 },
   trustProxy: 0,
 };
 

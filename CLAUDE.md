@@ -2,7 +2,7 @@
 
 คู่มือสำหรับ Claude Code ในโปรเจกต์ **ai-crm** — อ่านให้ครบก่อนเริ่มงานทุกครั้ง
 
-> **สถานะปัจจุบัน:** Phase 1–5 เสร็จ (foundation, auth + CRM API, web UI + ไฟล์ deploy, AI Copilot + approval flow, LINE OA) — ขั้นตอน deploy บน Railway และตั้งค่า LINE OA ต้องใช้บัญชีผู้ใช้ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ถัดไป Phase 6 (hardening + handover)
+> **สถานะปัจจุบัน:** Phase 1–6 เสร็จ (MVP ครบตามแผน) — เหลืองานที่ต้องใช้บัญชีผู้ใช้: push ขึ้น GitHub, deploy บน Railway, ตั้งค่า LINE OA, อัดวิดีโอ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ภาพรวมทั้งระบบ: [README.md](README.md) · monitoring: [docs/monitoring.md](docs/monitoring.md)
 > แผน: [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) · โจทย์: [docs/assignment.pdf](docs/assignment.pdf) (หน้า 1–3 JD, หน้า 4–5 โจทย์)
 
 ## คำสั่งที่ใช้บ่อย (รันที่ root)
@@ -64,6 +64,13 @@ env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `a
 - ส่งออกทุกทาง (AI ที่อนุมัติแล้ว / คนพิมพ์เอง / ส่งซ้ำ) ผ่าน `deliverMessage` เท่านั้น — Push API + `X-Line-Retry-Key` เดิมทุกครั้ง, 409 = LINE รับไปแล้ว, retry เองเฉพาะ 5xx / network
 - test ใช้ `createMockLineClient()` (`failNext` จำลอง LINE ล่ม, `afterAccept` จำลองคำตอบหาย) — ห้ามเรียก LINE จริงใน test
 - env: `LINE_MODE` (`mock` | `live`), `LINE_CHANNEL_SECRET` (ไม่ตั้ง = webhook ตอบ 503), `LINE_CHANNEL_ACCESS_TOKEN` (บังคับเมื่อ `live`)
+
+## Security / ops (ใช้ตั้งแต่ Phase 6)
+
+- API ใช้ `helmet()` และไม่เปิด CORS; security header ของเว็บ (CSP แบบไม่ใช้ nonce, HSTS, X-Frame-Options ฯลฯ) อยู่ใน `apps/web/next.config.ts` — เพิ่ม script / รูป / font จาก origin อื่นต้องแก้ CSP และตรวจใน production build (dev มี `unsafe-eval`)
+- endpoint สาธารณะใหม่ต้องมี rate limit ต่อ IP (ดู `modules/public/public.routes.ts`) และห้ามบอกว่าข้อมูลมีอยู่ในระบบหรือไม่
+- log ใหม่ที่ควร alert ต้องเพิ่มในตารางของ [docs/monitoring.md](docs/monitoring.md); ตัวเลขสำหรับ monitor อยู่ใน `GET /api/ops/summary` (`modules/ops`)
+- ก่อน commit: `pnpm audit --prod` ถ้ามีรายการใหม่ให้ตัดสินใจ (อัปเกรด / ยอมรับพร้อมเหตุผลใน README → Security)
 
 ## ข้อควรรู้ของ stack (ตรวจแล้วตอน Phase 1)
 

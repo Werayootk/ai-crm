@@ -16,6 +16,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // ไม่ครอบ /api (ไปที่ API ผ่าน rewrite), หน้า login, health check และไฟล์ static / icon
-  matcher: ['/((?!api|login|healthz|_next/static|_next/image|favicon.ico|icon.svg).*)'],
+  // ไม่ครอบ /api (ไปที่ API ผ่าน rewrite), หน้า login, ฟอร์มติดต่อสาธารณะ, health check และไฟล์ static / icon
+  matcher: ['/((?!api|login|contact-us|healthz|_next/static|_next/image|favicon.ico|icon.svg).*)'],
 };

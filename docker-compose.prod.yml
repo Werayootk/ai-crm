@@ -43,6 +43,11 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/ai_crm
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -base64 48)}
       TRUST_PROXY: 1
+      # ไม่บังคับ — ส่งผ่านจาก shell (ไม่ตั้ง = AI ใช้กติกาสำรอง / webhook LINE ปิด / LINE จำลอง)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LINE_MODE: ${LINE_MODE:-mock}
+      LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET:-}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

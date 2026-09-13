@@ -10,3 +10,5 @@ export * from './schemas/timeline';
 export * from './schemas/details';
 export * from './schemas/ai';
 export * from './schemas/line';
+export * from './schemas/public';
+export * from './schemas/ops';

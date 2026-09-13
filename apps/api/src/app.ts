@@ -1,6 +1,7 @@
 import type { CopilotRunOptions } from '@ai-crm/crm-copilot';
 import { randomUUID } from 'node:crypto';
 import express, { Router, type Express } from 'express';
+import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
 import type { PrismaClient } from './generated/prisma/client';
@@ -16,6 +17,8 @@ import type { LineClient } from './modules/line/line-client';
 import { createLineRouter } from './modules/line/line.routes';
 import type { WebhookProcessor } from './modules/line/webhook-processor';
 import { createLineWebhookRouter } from './modules/line/webhook.routes';
+import { createOpsRouter } from './modules/ops/ops.routes';
+import { createPublicRouter, type PublicRateLimitConfig } from './modules/public/public.routes';
 import { createUsersRouter } from './modules/users/users.routes';
 import { createHealthRouter } from './routes/health';
 
@@ -23,6 +26,7 @@ export interface AppConfig {
   session: SessionConfig;
   loginRateLimit: LoginRateLimitConfig;
   aiRateLimit: AiRateLimitConfig;
+  publicRateLimit: PublicRateLimitConfig;
   trustProxy: number;
 }
 
@@ -48,6 +52,9 @@ export function createApp(deps: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy);
+  // security headers มาตรฐาน (nosniff, frame-ancestors, HSTS ฯลฯ) — API ตอบ JSON อย่างเดียว
+  // ไม่เปิด CORS: browser เรียกผ่าน web (origin เดียวกัน) ส่วน LINE เรียกจาก server
+  app.use(helmet());
 
   app.use(
     pinoHttp({
@@ -108,6 +115,8 @@ export function createApp(deps: AppDeps): Express {
   api.use(createLeadsRouter(prisma));
   api.use(createAiRouter({ ...aiDeps, rateLimit: config.aiRateLimit }));
   api.use(createLineRouter({ ...outboundDeps, processor: deps.webhooks }));
+  api.use(createPublicRouter({ prisma, logger, rateLimit: config.publicRateLimit }));
+  api.use(createOpsRouter(prisma));
   app.use('/api', api);
 
   app.use(notFoundHandler);
