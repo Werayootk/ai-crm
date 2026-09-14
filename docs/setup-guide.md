@@ -17,7 +17,7 @@
 > - ส่วนที่ 2 ทดสอบจริงโดย `git clone` repo ใหม่บน macOS แล้วทำตามทีละขั้นจนเข้าเว็บได้; ข้อ 4.1 และกรณี API key ผิดในส่วนที่ 3 / 8 ทดสอบในเครื่องเดียวกัน; image ที่ใช้ deploy build และรันผ่านในเครื่อง
 > - ข้อ 4.4 (Quick Tunnel) ทดสอบจริง: เปิด tunnel ไปที่ api บนเครื่อง แล้วส่ง webhook ที่เซ็นแบบ LINE ผ่าน URL `https://….trycloudflare.com` — ข้อความถูกบันทึก, event ซ้ำถูกข้าม, ลายเซ็นผิดได้ 401, คำขอแบบปุ่ม Verify (`events: []`) ได้ 200; ส่วนที่ต้องใช้บัญชี LINE จริง (ข้อ 4.2, 4.5, 4.6) ยังไม่ได้ลอง
 > - คำสั่งติดตั้งโปรแกรมในส่วนที่ 1 มาจากเอกสารทางการของแต่ละโปรแกรม (เครื่องที่ทดสอบติดตั้งไว้แล้ว จึงไม่ได้รันซ้ำ)
-> - ส่วนที่ 3, 5 และ 6 เป็นหน้าเว็บของผู้ให้บริการ ชื่อเมนูยึดตามเอกสารทางการของ Anthropic / Railway / LINE ณ วันที่เขียน แต่**ยังไม่ได้ลองกับบัญชีจริง** — ถ้าหน้าตาเว็บเปลี่ยน ให้มองหาคำที่ใกล้เคียง
+> - ส่วนที่ 3, 5 และ 6 เป็นหน้าเว็บของผู้ให้บริการ ชื่อเมนูยึดตามเอกสารทางการของ Anthropic / Railway / LINE ณ วันที่เขียน แต่**ยังไม่ได้ลองกับบัญชีจริง** (ยกเว้นขั้น import repo ในข้อ 5.4 ที่ลองจริงแล้ว — Railway แยก service ตาม package จึงปรับข้อ 5.4–5.5 ตามที่เจอ) — ถ้าหน้าตาเว็บเปลี่ยน ให้มองหาคำที่ใกล้เคียง
 
 ---
 
@@ -486,10 +486,13 @@ JWT_SECRET=x docker compose -f docker-compose.prod.yml stop
 2. Railway จะให้ trial (เครดิต $5 ใช้ได้ 30 วัน) และ**ยืนยันตัวตนจากบัญชี GitHub** — ถ้ายืนยันไม่ผ่านจะเป็น **Limited Trial** ซึ่ง**จำกัดการออกอินเทอร์เน็ตของ service** ทำให้เรียก Claude และ LINE ไม่ได้ (AI จะใช้กติกาสำรอง, ส่ง LINE จะ "ส่งไม่สำเร็จ") → แก้ด้วยการอัปเกรดเป็นแผน **Hobby**
 3. ให้ Railway เข้าถึง repo: ติดตั้ง Railway App ใน GitHub ที่ https://github.com/apps/railway-app/installations/new แล้วเลือก repo `ai-crm` (หรือทำตอน Railway ถามในขั้นถัดไป)
 
-### 5.4 สร้างโปรเจกต์และ service `api`
+### 5.4 สร้างโปรเจกต์และตั้งค่า service `api`
 
-1. หน้า Dashboard → **New Project** → **GitHub Repository** → เลือก `ai-crm` → เลือก **Add variables** (**ยังไม่กด Deploy Now** — ต้องตั้งค่าก่อน)
-2. Railway สร้าง service ชื่อเดียวกับ repo ให้ → คลิกกล่อง service → แท็บ **Settings** → เปลี่ยนชื่อ service เป็น **`api`** (ชื่อนี้ถูกอ้างถึงในตัวแปรของ web ต้องตรงเป๊ะ)
+1. หน้า Dashboard → **New Project** → **GitHub Repository** → เลือก `ai-crm` — **ยังไม่กด Deploy** (ต้องตั้งค่าก่อน)
+2. Railway ตรวจเจอว่า repo นี้เป็น monorepo แล้ววาง service ให้ทุก package บน canvas (ยังเป็น staged changes ยังไม่ deploy) เช่น `@ai-crm/api`, `@ai-crm/web`, `@ai-crm/crm-copilot` — **ใช้แค่ 2 ตัว**:
+   - **ลบ `@ai-crm/crm-copilot`** (และ `@ai-crm/shared` ถ้ามี) — เป็น library ที่ถูกรวมเข้าไปใน image ของ api / web อยู่แล้ว ไม่มี server ของตัวเอง deploy ไปก็ start ไม่ได้และเสียเงินเปล่า: เปิด **Settings ของโปรเจกต์** → หัวข้อ **Danger** → ลบ service นั้น
+   - คลิก `@ai-crm/api` → แท็บ **Settings** → เปลี่ยนชื่อ service เป็น **`api`** (ชื่อนี้ถูกอ้างถึงในตัวแปรของ web ต้องตรงเป๊ะ) — ส่วน `@ai-crm/web` เก็บไว้ตั้งค่าในข้อ 5.5
+   - ถ้า Railway สร้าง service เดียวชื่อ `ai-crm` แทน ให้เปลี่ยนชื่อตัวนั้นเป็น `api` แล้วในข้อ 5.5 สร้าง web เอง
 3. เพิ่มฐานข้อมูล: กดปุ่ม **New** มุมขวาบนของหน้า canvas (หรือ `Cmd + K`) → **Database** → **PostgreSQL** → จะได้ service ชื่อ **`Postgres`**
 4. สร้างค่าสุ่มสำหรับ `JWT_SECRET` บนเครื่อง (ใช้คนละค่ากับในเครื่อง):
 
@@ -519,21 +522,18 @@ JWT_SECRET=x docker compose -f docker-compose.prod.yml stop
    |---|---|
    | Root Directory | เว้นว่าง (build จาก root ของ repo) |
    | Branch (trigger branch) | `main` |
-   | Watch Paths | `/apps/api/**` · `/packages/shared/**` · `/skills/**` · `/pnpm-lock.yaml` (บรรทัดละ 1 รูปแบบ) |
+   | Build Command และ Start Command | **ลบให้ว่าง** — Railway ใส่ `pnpm --filter @ai-crm/api …` ให้เองตอนแยก package ถ้าเหลือไว้ Start Command จะทับคำสั่งใน Dockerfile |
+   | Watch Paths | `/apps/api/**` · `/packages/shared/**` · `/skills/**` · `/pnpm-lock.yaml` (บรรทัดละ 1 รูปแบบ — Railway ใส่ให้แค่ `/apps/api/**` ต้องเพิ่มให้ครบ) |
    | Pre-deploy Command | `pnpm --filter @ai-crm/api db:deploy` (สร้าง/อัปเดตตารางก่อนสลับเวอร์ชันทุกครั้ง) |
    | Healthcheck Path | `/api/health` |
    | Networking | **ไม่ต้อง** Generate Domain |
    | Wait for CI (ถ้ามีตัวเลือก) | เปิด — รอ GitHub Actions ผ่านก่อนค่อย deploy |
 
-7. จะมีแถบ **staged changes** บน canvas → กด **Deploy**
-8. คลิก service api → แท็บ **Deployments** → เปิด deployment ล่าสุด ดู log:
-   - Build: build จาก `apps/api/Dockerfile` (หลายนาทีในครั้งแรก)
-   - Pre-deploy: ต้องเห็น `All migrations have been successfully applied.`
-   - Deploy: ต้องเห็น `integrations configured` และ `api listening` แล้วสถานะเป็นสำเร็จ
+7. **ยังไม่ต้องกด Deploy** — ตั้งค่า web ในข้อ 5.5 ให้เสร็จก่อนแล้วกด Deploy ครั้งเดียว (ถ้ากดตอนนี้ web ที่ยังไม่ได้ตั้งค่าจะ build ล้ม)
 
-### 5.5 สร้าง service `web`
+### 5.5 ตั้งค่า service `web` แล้ว deploy
 
-1. **New** → **GitHub Repo** → เลือก `ai-crm` อีกครั้ง → เปลี่ยนชื่อ service เป็น **`web`**
+1. คลิก service **`@ai-crm/web`** ที่ Railway วางไว้ → แท็บ **Settings** → เปลี่ยนชื่อเป็น **`web`** (ถ้าไม่มี: **New** → **GitHub Repo** → เลือก `ai-crm` แล้วเปลี่ยนชื่อเป็น `web`)
 2. **Variables** → **RAW Editor**:
 
    ```env
@@ -550,12 +550,18 @@ JWT_SECRET=x docker compose -f docker-compose.prod.yml stop
    |---|---|
    | Root Directory | เว้นว่าง |
    | Branch | `main` |
+   | Build Command และ Start Command | **ลบให้ว่าง** — ใน image ของ web ไม่มี pnpm ถ้าเหลือ `pnpm --filter @ai-crm/web start` web จะ start ไม่ขึ้น |
    | Watch Paths | `/apps/web/**` · `/packages/shared/**` · `/pnpm-lock.yaml` |
    | Healthcheck Path | `/healthz` |
    | Networking → Public Networking | กด **Generate Domain** (ถ้าถาม port ใส่ `3000`) → ได้ `https://<ชื่อ>.up.railway.app` = **URL ของเว็บ** |
    | Wait for CI (ถ้ามี) | เปิด |
 
-4. กด **Deploy** → รอ build (หลายนาที) → เปิด URL ของเว็บ ต้องเห็นหน้า login
+4. บน canvas ต้องเหลือ 3 service: `Postgres`, `api`, `web` → กด **Deploy** ที่แถบ **staged changes** → รอ build (หลายนาทีในครั้งแรก)
+5. คลิก service api → แท็บ **Deployments** → เปิด deployment ล่าสุด ดู log:
+   - Build: build จาก `apps/api/Dockerfile`
+   - Pre-deploy: ต้องเห็น `All migrations have been successfully applied.`
+   - Deploy: ต้องเห็น `integrations configured` และ `api listening` แล้วสถานะเป็นสำเร็จ
+6. เปิด URL ของเว็บ ต้องเห็นหน้า login
 
 ### 5.6 ใส่ข้อมูล demo (ทำครั้งเดียว)
 
@@ -718,6 +724,8 @@ deploy แล้วพัง → service → แท็บ **Deployments** → �
 | อาการ | สาเหตุ / วิธีแก้ |
 |---|---|
 | build ไม่ใช้ Dockerfile ของเรา / build ผิดวิธี | ขาดตัวแปร `RAILWAY_DOCKERFILE_PATH` (ข้อ 5.4 / 5.5) หรือ Root Directory ไม่ว่าง |
+| build ผ่านแต่ start ไม่ขึ้น (หา `pnpm` ไม่เจอ / รันคำสั่ง `pnpm --filter …`) | ยังไม่ได้ลบ Start Command ที่ Railway ใส่ให้ตอนแยก package (ข้อ 5.4 / 5.5) |
+| มี service `@ai-crm/crm-copilot` หรือ `@ai-crm/shared` build / deploy ล้ม | ไม่ต้อง deploy — เป็น library ที่อยู่ใน image ของ api / web แล้ว ลบทิ้งได้ (ข้อ 5.4) |
 | api deploy ล้มที่ขั้น pre-deploy | ดู log: ต่อฐานข้อมูลไม่ได้ = `DATABASE_URL` อ้างชื่อ service ผิด (ต้องตรงกับชื่อ service ฐานข้อมูล เช่น `${{Postgres.DATABASE_URL}}`) |
 | api ขึ้น `Invalid environment variables` ใน Deploy Logs | ตัวแปรขาด / ผิดรูปแบบ — log บอกชื่อตัวแปร (ไม่แสดงค่า) |
 | healthcheck ไม่ผ่าน | api: `/api/health` ตอบ 503 เมื่อต่อฐานข้อมูลไม่ได้; web: ต้องมี `PORT=3000` และ Healthcheck Path `/healthz` |

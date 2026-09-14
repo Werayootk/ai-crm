@@ -72,7 +72,7 @@ env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `a
 - log ใหม่ที่ควร alert ต้องเพิ่มในตารางของ `docs/monitoring.md`; ตัวเลขสำหรับ monitor อยู่ใน `GET /api/ops/summary` (`modules/ops`)
 - ก่อน commit: `pnpm audit --prod` ถ้ามีรายการใหม่ให้ตัดสินใจ (อัปเกรด / ยอมรับพร้อมเหตุผลใน README → Security)
 - แก้ขั้นตอนที่ผู้ใช้ต้องทำเอง (setup / deploy / ตัวแปร / LINE / API key) → อัปเดต `docs/setup-guide.md` ด้วย — ชื่อเมนูของเว็บผู้ให้บริการต้องตรวจจากเอกสารทางการ ไม่เขียนจากความจำ
-- **Railway ตั้งค่าผ่านหน้าเว็บ** (Config as Code / `railway.json` ใช้กับ service ใหม่ไม่ได้ — อย่าเพิ่มกลับ): Dockerfile path, pre-deploy, healthcheck, watch paths และตัวแปรอยู่ใน setup-guide ข้อ 5.4–5.5
+- **Railway ตั้งค่าผ่านหน้าเว็บ** (Config as Code / `railway.json` ใช้กับ service ใหม่ไม่ได้ — อย่าเพิ่มกลับ): Dockerfile path, pre-deploy, healthcheck, watch paths และตัวแปรอยู่ใน setup-guide ข้อ 5.4–5.5 — ตอน import Railway แยก service ให้ทุก package และใส่ Build / Start Command (`pnpm --filter …`) ให้เอง: ใช้แค่ `api` / `web` และต้องล้าง Start Command เพราะจะทับ CMD ของ Dockerfile
 - Dockerfile ห้ามใช้ BuildKit cache mount (`RUN --mount=type=cache`) — Railway รับเฉพาะ id แบบ `s/<service id>-…` ที่ต้องฝัง id ของ service; ลบ cache ในคำสั่งเดียวกับที่ติดตั้งแทน
 
 ## ข้อควรรู้ของ stack (ตรวจแล้วตอน Phase 1)
@@ -84,6 +84,7 @@ env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `a
 - `packages/shared` export เป็น TypeScript source: api bundle ด้วย tsup (`noExternal`), web ใช้ `transpilePackages`
 - test ใช้ DB ที่ชื่อลงท้าย `_test` เท่านั้น (ถูกล้างทุกครั้งที่รัน)
 - **Next.js 16**: อ่านเอกสารใน `node_modules/next/dist/docs/` ก่อนเขียนโค้ดฝั่ง web (ดู `apps/web/AGENTS.md` ที่ Next สร้าง) — API ต่างจากเวอร์ชันเก่า
+- type `PageProps` / route types ของ Next มาจากไฟล์ที่ generate (`next-env.d.ts`, `.next/` อยู่ใน `.gitignore`) — ในเครื่อง lint ผ่านเพราะ `pnpm dev` สร้างไว้แล้ว แต่ใน clone ใหม่ต้องรัน `next typegen` ก่อน (CI ทำก่อน `pnpm lint`; `typecheck` ของ web ทำเอง)
 - version ที่ pin ไว้โดยตั้งใจ: TypeScript 6.0 (typescript-eslint ยังไม่รองรับ 7), Prisma 7.10 (8.0 ยังเป็น RC), zod 4.6.2 (ผ่านเกณฑ์ minimum release age ของ pnpm); pnpm อนุญาต install script แค่ใน `allowBuilds`
 
 ---

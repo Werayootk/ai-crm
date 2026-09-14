@@ -14,7 +14,7 @@
 - **สิ่งที่คน review / reject**: reject การเริ่มโค้ดทันทีหลังวางแผน (19:17), เปลี่ยน model จาก `claude-opus-5` ที่ AI เสนอเป็น `claude-sonnet-5` (19:33), เลือกให้ commit ทีละ phase บน branch ของตัวเอง (22:13) — ตารางท้ายไฟล์
 - **การเปลี่ยนแปลงสำคัญจาก human inspection**: การ reject ตอน 19:17 เปลี่ยนวิธีทำงานทั้งโปรเจกต์ — แผนต้องเก็บใน `docs/plans/` ก่อนเขียนโค้ด, ทุก session ต้องบันทึก log นี้ด้วยเวลาจริง และทุก phase ต้องบันทึก "สิ่งที่ต่างจากแผน" → ผู้ประเมินตรวจย้อนได้ว่าอะไรเปลี่ยนเพราะอะไร
 - **AI ตรวจงานตัวเองอย่างไร** (ไม่ได้แทน human review): อ่านซอร์ส / สเปกทางการของ SDK และ LINE ก่อนเขียน, ตรวจทุกหน้าใน Chrome จริง (เจอ bug ที่ test ไม่จับหลายจุด เช่น logout redirect ซ้อน, ลำดับ timeline ของ LINE), หาต้นเหตุ test ล้มแบบสุ่มจนเจอเรื่องพอร์ตชนบน macOS แทนการใส่ retry, mutation test ยืนยันว่า test ความปลอดภัยจับ bug ได้จริง
-- **ยังรอ**: ผู้ใช้ review โค้ดของ Phase 4–6 บน branch และ deploy / ตั้งค่า LINE OA จริงด้วยบัญชีของตัวเอง
+- **ยังรอ**: PR #1 (Phase 1–6 + เอกสารส่งมอบ) merge เข้า `main` แล้ว 2026-09-14 — เหลือ deploy บน Railway / ตั้งค่า LINE OA จริง / อัดวิดีโอ ด้วยบัญชีของผู้ใช้
 
 ---
 
@@ -412,6 +412,32 @@
 
 ---
 
+### #14 · 2026-09-14 15:53 — merge PR #1, CI ล้ม, worktree และ Railway แยก service ตาม package
+
+**Prompt** (5 ข้อความต่อกัน)
+
+> ตอน merge เข้า main add Add a description แนะนำที (15:53)
+>
+> แก้ปิด ci.yml ไปก่อน merge เข้า main ครั้งแรก (16:02)
+>
+> ทำไม branch main ผมบังคับให้เปิด working tree (16:19)
+>
+> นอกจาก railway มีตัวอื่นไหม (16:28)
+>
+> @ai-crm/crm-copilot ตรง setup-guide มันติดขึ้น railway ไปด้วยต้อง deploy ไหม / กับช่วยสร้างไฟล์ CI.yml ใหม่ให้ที (16:55)
+
+**สิ่งที่ AI ทำ**
+
+- 15:53 ร่าง title + description ของ PR (สรุป 7 commit ตาม phase, วิธีตรวจ, security, ข้อจำกัด) และแนะนำให้ merge แบบ "Create a merge commit" เพราะ log / แผนอ้าง hash ของ commit (squash / rebase ของ GitHub เปลี่ยน hash)
+- 16:02 ก่อนปิด CI ดูผลการรันจริงผ่าน GitHub API: ล้มที่ `pnpm lint` ในหน้า `[id]` 3 หน้า (`PageProps` resolve ไม่ได้) → **ลอง clone ใหม่ใน scratchpad ได้ error 9 ตัวเหมือน CI** → รัน `next typegen` ก่อนแล้ว lint / typecheck / test (199) / build ผ่านทั้งหมด = ต้นเหตุคือลำดับขั้นใน CI ไม่ใช่ bug ในโค้ด (ในเครื่องไม่เจอเพราะ `pnpm dev` สร้างไฟล์ type ไว้แล้ว) — แก้ `ci.yml` เป็นรันเองได้อย่างเดียว + เพิ่มขั้น typegen และเสนอให้เปิดกลับเลย
+- 16:19 ตรวจ `git worktree list`: `main` ถูก checkout ค้างใน `../ai-crm.worktrees/main` (สร้าง 16:16 ไม่ได้มาจาก AI) และ `git fetch -u origin main:main` เลื่อน ref ไป merge commit โดยไม่อัปเดตไฟล์ → worktree นั้นเห็นไฟล์ 195 ตัว "ถูกลบ" แบบ staged (ถ้า commit จะลบทั้งโปรเจกต์บน main) — ตรวจแล้วไม่มีงานค้างจึงแนะนำ `git worktree remove --force` (ผู้ใช้ลบเอง)
+- 16:28 เทียบทางเลือกนอกจาก Railway (Render, Fly.io, VPS + compose) กับเงื่อนไขของระบบ (api ต้องรันตลอด, DB อยู่ยาว, ออกอินเทอร์เน็ตได้) — ตรวจ free tier / ราคาจากเอกสารทางการ: Render แบบฟรีหลับหลัง 15 นาทีและ Postgres ฟรีหมดอายุ 30 วันจึงใช้กับ LINE webhook ไม่ได้ → แนะนำใช้ Railway ต่อถ้าไม่มีปัญหาเฉพาะ
+- 16:55 ตรวจเอกสาร Railway: ตอน import monorepo Railway วาง service ให้ทุก package และตั้ง Build / Start Command (`pnpm --filter …`) + Watch Paths ให้เอง และ Start Command **ทับ CMD ของ Dockerfile** (image ของ web ไม่มี pnpm → start ไม่ขึ้น) → แก้ setup-guide ข้อ 5.4–5.5 (ลบ `@ai-crm/crm-copilot` / `@ai-crm/shared`, เปลี่ยนชื่อ, ล้าง command, เพิ่ม Watch Paths, กด Deploy ครั้งเดียวหลังตั้งทั้ง api และ web) + แถวแก้ปัญหา 2 แถว; สร้าง `.github/workflows/ci.yml` ใหม่ (trigger เดิม + `next typegen` ก่อน lint, คง action version ที่รันผ่านแล้ว) บน branch `fix-ci-railway-monorepo`; เพิ่มข้อควรรู้ใน `CLAUDE.md`
+
+**Human review** — ผู้ใช้เลือก**ลบ `ci.yml` ทิ้ง** (commit `7a99767` ของผู้ใช้เอง) แทนเวอร์ชันที่ AI ปิด trigger แล้ว merge PR #1 ก่อน จากนั้นขอสร้างใหม่; ผู้ใช้เป็นคนเจอว่า Railway สร้าง service ของ `crm-copilot` ขึ้นมาตอนลอง deploy จริง — ยังไม่ commit รอผู้ใช้ตรวจ
+
+---
+
 ## Review / Reject / การเปลี่ยนแปลงหลัง human inspection
 
 | วันเวลา | สิ่งที่ AI เสนอ | การตัดสินใจของคน | ผลที่เปลี่ยนไป |
@@ -420,3 +446,5 @@
 | 2026-09-13 19:33 | AI model `claude-opus-5` | **เปลี่ยน** เป็น `claude-sonnet-5` | ค่า default ของ `AI_MODEL` และตัวอย่างใน schema เปลี่ยนตาม; ยืนยัน Railway และ JWT cookie ตามที่เสนอ |
 | 2026-09-13 22:13 | ถามวิธี commit Phase 4–6 (ทีละ phase / รวดเดียวตอนจบ) | **เลือก** commit ทีละ phase | แต่ละ phase อยู่บน branch ของตัวเองและ commit ในเครื่องทันทีที่เสร็จ ไม่ push |
 | 2026-09-14 15:28 | เอกสาร 3 ชั้น (README → deploy-railway → setup-guide) ลิงก์ข้ามไฟล์ 55 จุด | **ขอให้ลด** ก่อน commit | รวม `deploy-railway.md` เข้า README / setup-guide แล้วลบ, ลิงก์ข้ามไฟล์เหลือ 8 (ศูนย์รวมที่ README), เพิ่มกติกาการเขียนเอกสารใน `CLAUDE.md` |
+| 2026-09-14 16:02 | ปิด trigger ของ CI + เพิ่มขั้น `next typegen` (ต้นเหตุที่ CI ล้ม ทดสอบใน clone ใหม่แล้ว) | **ลบ `ci.yml` ทิ้งเอง** แล้ว merge PR #1 ก่อน จากนั้นขอสร้างใหม่ | CI กลับมาพร้อมขั้น typegen บน branch ใหม่; เพิ่มข้อควรรู้เรื่อง type ที่ generate ใน `CLAUDE.md` |
+| 2026-09-14 16:55 | setup-guide ข้อ 5.4 เขียนตามเอกสารว่า import แล้วได้ service เดียว | **ผู้ใช้ลองจริงแล้วเจอ** service ของ `@ai-crm/crm-copilot` บน Railway | แก้ข้อ 5.4–5.5: ลบ service ที่เป็น library, ล้าง Build / Start Command ที่ Railway ใส่ให้ (ทับ CMD ของ Dockerfile), Deploy ครั้งเดียว |
