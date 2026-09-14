@@ -1,0 +1,9 @@
+{
+  "name": "run-ai-crm-driver",
+  "private": true,
+  "type": "module",
+  "description": "Browser driver for the run-ai-crm skill (not part of the pnpm workspace)",
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

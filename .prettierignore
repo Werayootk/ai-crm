@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+coverage
+pnpm-lock.yaml
+**/src/generated/**
+**/prisma/migrations/**
+**/next-env.d.ts
+# markdown (docs, CLAUDE.md, AGENTS.md ที่ Next สร้าง) จัดรูปแบบด้วยมือ
+*.md

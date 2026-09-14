@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - skills/*
+
+# pnpm 11 ไม่รัน install script ของ dependency โดย default — อนุญาตเฉพาะที่จำเป็น
+allowBuilds:
+  '@prisma/engines': true # ดาวน์โหลด schema engine สำหรับ prisma migrate
+  prisma: true
+  esbuild: true # binary ของ esbuild (ใช้โดย tsx, tsup, vite)

@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+@theme {
+  /* ฟอนต์ของระบบที่รองรับภาษาไทย — ไม่โหลดฟอนต์จากภายนอกตอน build */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Noto Sans Thai', 'Leelawadee UI',
+    Thonburi, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* <dialog> ของ browser — ใช้แทน modal library */
+dialog::backdrop {
+  background: rgb(15 23 42 / 0.45);
+}

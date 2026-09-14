@@ -1,0 +1,68 @@
+# รัน production image ทั้งชุดในเครื่อง (จำลองการ deploy บน Railway) — ไม่ใช่ใช้ตอน dev
+#   JWT_SECRET=$(openssl rand -base64 48) docker compose -f docker-compose.prod.yml up --build
+# seed ครั้งแรก (ข้อมูลสังเคราะห์):
+#   docker compose -f docker-compose.prod.yml run --rm -e SEED_DEMO_PASSWORD=... -e ALLOW_PRODUCTION_SEED=true migrate pnpm --filter @ai-crm/api db:seed
+name: ai-crm-prod
+
+x-api-image: &api-image
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  image: ai-crm-api:local
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres # เครื่อง local เท่านั้น
+      POSTGRES_DB: ai_crm
+    volumes:
+      - prod-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ai_crm']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # เทียบเท่า preDeployCommand ของ Railway
+  migrate:
+    <<: *api-image
+    command: ['pnpm', '--filter', '@ai-crm/api', 'db:deploy']
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/ai_crm
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *api-image
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/ai_crm
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -base64 48)}
+      TRUST_PROXY: 1
+      # ไม่บังคับ — ส่งผ่านจาก shell (ไม่ตั้ง = AI ใช้กติกาสำรอง / webhook LINE ปิด / LINE จำลอง)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LINE_MODE: ${LINE_MODE:-mock}
+      LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET:-}
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_URL: http://api:4000
+    image: ai-crm-web:local
+    ports:
+      - '${WEB_PORT:-3100}:3000'
+    depends_on:
+      - api
+
+volumes:
+  prod-pgdata:
