@@ -4,14 +4,16 @@ AI CRM MVP สำหรับทีมขาย 20 คน (~2,000 contacts, 300 
 
 Next.js 16 (`apps/web`) · Express 5 (`apps/api`) · Prisma 7 + PostgreSQL 17 · zod (`packages/shared`) · Claude ผ่าน `@anthropic-ai/sdk` (`skills/crm-copilot`) · LINE Messaging API · pnpm workspaces · Railway
 
+> **เริ่มใช้งานครั้งแรก / ไม่เคย setup มาก่อน → [docs/setup-guide.md](docs/setup-guide.md)** คู่มือทีละขั้น: เตรียมเครื่อง → รันบนเครื่อง → เอา `ANTHROPIC_API_KEY` → ลอง LINE (แบบจำลอง / LINE จริงคุยกับระบบบนเครื่องผ่าน tunnel) → deploy ครั้งแรกบน Railway → ต่อ LINE OA เข้า production → ขั้นตอนเมื่อมีการแก้ไข → แก้ปัญหาที่พบบ่อย
+
 ## Demo
 
 | | |
 |---|---|
-| URL | ใส่หลัง deploy ตาม [docs/deploy-railway.md](docs/deploy-railway.md) |
+| URL | ใส่หลัง deploy (setup-guide ส่วนที่ 5) |
 | บัญชี | `admin@demo.local` (admin), `sales01@demo.local` … `sales19@demo.local` — รหัสผ่านคือ `SEED_DEMO_PASSWORD` ที่ตั้งตอน seed (ส่งแยก ไม่อยู่ใน repo) |
 | ฟอร์มสาธารณะ | `/contact-us` (ไม่ต้อง login) |
-| LINE | สแกน QR ของ OA (ตั้งค่าตาม [LINE OA](docs/deploy-railway.md#line-oa)) หรือทดลองในเครื่องด้วย `pnpm line:simulate` |
+| LINE | สแกน QR ของ OA (setup-guide ส่วนที่ 6) หรือทดลองในเครื่อง: แบบจำลองด้วย `pnpm line:simulate` / ทักจากมือถือจริงผ่าน tunnel (setup-guide ส่วนที่ 4) |
 | ข้อมูล | สังเคราะห์ทั้งหมด (seed แบบ fixed seed) — ไม่มีข้อมูลลูกค้าจริง |
 
 ## ทำอะไรได้บ้าง
@@ -40,7 +42,7 @@ flowchart LR
   S -->|messages.parse + zod| C[Claude API]
 ```
 
-- `apps/api` เป็นที่เดียวที่ต่อ DB; `apps/web` เรียก API ผ่าน rewrite ของตัวเอง → cookie เป็น first-party ไม่ต้องเปิด CORS และ `api` ไม่ต้องมี public domain
+- `apps/api` เป็นที่เดียวที่ต่อ DB; ทุก request (browser และ LINE) เข้าทาง `web` แล้ว rewrite `/api/*` ไป `api` ผ่าน private network → cookie เป็น first-party ไม่ต้องเปิด CORS, `api` ไม่มี public domain และ `TRUST_PROXY=2` (Railway edge + Next) ถูกทุก request (ทดสอบบน production image แล้วว่า rewrite ส่ง body ดิบ + `x-line-signature` ครบ ลายเซ็น LINE ผ่าน)
 - `packages/shared` มี zod schema ของทุก request / response / enum / กติกา stage — API validate และเว็บ parse ด้วย schema ชุดเดียวกัน
 - `skills/crm-copilot` เป็น pure package: รับ CRM context คืน structured output ที่ผ่าน zod — **ไม่มีทางเขียน DB หรือส่ง LINE เอง** (บังคับด้วยโครงสร้าง dependency ไม่ใช่แค่วินัย)
 
@@ -69,9 +71,11 @@ sequenceDiagram
   L->>U: ข้อความถึงลูกค้า
 ```
 
-Data model อยู่ที่ [apps/api/prisma/schema.prisma](apps/api/prisma/schema.prisma) — เหตุผลของตาราง `AiSuggestion` (กำแพงระหว่าง AI กับข้อมูลจริง + audit) และ `WebhookEvent` (idempotency + retry + replay) อยู่ใน [แผน](docs/plans/2026-09-13-mvp-plan.md#1-prisma-schema); CHECK constraints (score 0–100, value ≥ 0, Lost ต้องมีเหตุผล, closedAt ตรงกับ stage) และ partial unique index (PENDING ได้ทีละ 1 ต่อ lead ต่อประเภท) อยู่ใน migration
+Data model อยู่ที่ [apps/api/prisma/schema.prisma](apps/api/prisma/schema.prisma) — เหตุผลของตาราง `AiSuggestion` (กำแพงระหว่าง AI กับข้อมูลจริง + audit) และ `WebhookEvent` (idempotency + retry + replay) อยู่ในแผน (`docs/plans/2026-09-13-mvp-plan.md` หัวข้อ 1); CHECK constraints (score 0–100, value ≥ 0, Lost ต้องมีเหตุผล, closedAt ตรงกับ stage) และ partial unique index (PENDING ได้ทีละ 1 ต่อ lead ต่อประเภท) อยู่ใน migration
 
 ## Quick start (local)
+
+สำหรับคนที่คุ้นเครื่องมืออยู่แล้ว — ถ้าไม่แน่ใจขั้นไหน ดูคำอธิบายละเอียดที่ setup-guide ส่วนที่ 1–4
 
 ต้องมี Node ≥ 22.12, pnpm 11 และ Docker
 
@@ -96,8 +100,10 @@ pnpm dev            # web http://localhost:3000 · api http://localhost:4000
   pnpm line:simulate "ปลอม" --bad-signature           # ลายเซ็นผิด → 401
   ```
 
+- **LINE จริง + ระบบบนเครื่อง**: ใส่ `LINE_MODE=live` + channel secret / access token จริงใน `apps/api/.env` → `cloudflared tunnel --url http://localhost:4000` → ตั้ง Webhook URL เป็น `https://<คำสุ่ม>.trycloudflare.com/api/webhooks/line` → ทักจากมือถือ (setup-guide ข้อ 4.2–4.6)
 - เรียก API ด้วยมือ: [apps/api/requests.http](apps/api/requests.http) (VS Code REST Client)
 - production image ชุดเดียวกับ Railway: `JWT_SECRET=$(openssl rand -base64 48) docker compose -f docker-compose.prod.yml up --build` → http://localhost:3100
+- deploy ครั้งแรก / เมื่อมีการแก้ไขหลัง deploy: setup-guide ส่วนที่ 5–7 (Railway: Postgres + `api` ไม่มี domain + `web` มี domain, ตั้งค่าผ่านหน้าเว็บ Railway)
 
 ## Environment variables
 
@@ -140,7 +146,7 @@ prefix `/api` · JSON · ทุก route validate `params` / `query` / `body` �
 | POST | `/webhooks/line` | 🔓 ลายเซ็น | รับ event จาก LINE |
 | GET POST | `/webhook-events` · `/webhook-events/:id/retry` | 🛡️ | ดู event ตามสถานะ · สั่งประมวลผลใหม่ |
 | POST | `/public/leads` | 🔓 | ฟอร์ม "ติดต่อเรา" (จำกัด 5 / 10 นาที / IP, honeypot, ต้องยินยอม PDPA) |
-| GET | `/ops/summary` | 🛡️ | ตัวเลขสำหรับ monitor ([monitoring.md](docs/monitoring.md)) |
+| GET | `/ops/summary` | 🛡️ | ตัวเลขสำหรับ monitor (ความหมาย / เกณฑ์ alert อยู่ใน monitoring notes) |
 
 ตัวอย่างครบทุก endpoint: [apps/api/requests.http](apps/api/requests.http)
 
@@ -183,15 +189,18 @@ test สำคัญของ security ผ่าน mutation test แล้ว (
 | `fetch` + zod ตาม OpenAPI ของ LINE | `@line/bot-sdk` | ใช้แค่ 3 อย่าง (push, profile, ลายเซ็น) test ด้วย fetch ปลอมได้ตรงๆ |
 | JWT cookie ไม่มี session store | server session | ง่ายและพอสำหรับ 20 คน (ดูข้อจำกัด) |
 | UI เขียนเองบน element ของ browser | shadcn / react-hook-form | dependency น้อย ฟอร์มใช้ schema เดียวกับ API |
+| ตั้งค่า Railway ในหน้าเว็บ (ขั้นตอนอยู่ใน setup-guide) | `railway.json` / IaC | Config as Code (`railway.json`) ใช้กับ service ใหม่ไม่ได้แล้ว (เอกสาร Railway 2026-09); IaC (`.railway/railway.ts`) ยังทดสอบกับบัญชีจริงไม่ได้ → next step ข้อ 7 |
 
 ## Known limitations
 
 - ต้องรัน `api` instance เดียว (คิว LINE, retry worker, rate limit อยู่ในหน่วยความจำ)
 - logout ลบแค่ cookie — JWT ที่ถูกขโมยใช้ได้จนหมดอายุ (8 ชม.)
 - ยังไม่มีสิทธิ์ราย lead (sales ทุกคนเห็น / แก้ lead ทุกตัว) และหน้า admin บนเว็บ (ใช้ API แทน)
-- LINE: รองรับข้อความ 1:1 (ไม่รับ group / room), ไฟล์ / รูปบันทึกเป็นข้อความแทน "[รูปภาพ]" ไม่เก็บไฟล์, retry key ใช้ได้ 24 ชม.
+- LINE: รองรับข้อความ 1:1 (ไม่รับ group / room), ไฟล์ / รูปบันทึกเป็นข้อความแทน "[รูปภาพ]" ไม่เก็บไฟล์, retry key ใช้ได้ 24 ชม. (กด "ส่งอีกครั้ง" หลังจากนั้น ถ้าครั้งแรก LINE รับไปแล้วจริง ลูกค้าอาจได้ซ้ำ)
 - ยังไม่ได้รัน eval กับ Claude จริงในเครื่องที่พัฒนา (ไม่มี API key) — eval และ test รันกับกติกาสำรอง / Claude provider ผ่าน SDK จริงกับ fetch ปลอม
-- image ของ `api` ใหญ่ (~960MB) เพราะเก็บ Prisma CLI ไว้ migrate
+- image ของ `api` ใหญ่ (~950MB) เพราะเก็บ Prisma CLI ไว้ migrate
+- ค่าตั้งค่าของ Railway (Dockerfile path, pre-deploy, healthcheck, watch paths) อยู่ในหน้าเว็บ Railway ไม่ได้อยู่ใน repo — ตั้งตาม setup-guide ข้อ 5.4–5.5
+- บัญชี Railway แบบ Limited Trial จำกัดการออกอินเทอร์เน็ต → เรียก Claude / LINE ไม่ได้ (AI ใช้กติกาสำรอง, ส่ง LINE ไม่สำเร็จ) ต้องใช้แผน Hobby ขึ้นไป
 
 ## Production next steps
 
@@ -201,13 +210,14 @@ test สำคัญของ security ผ่าน mutation test แล้ว (
 4. รัน eval กับ Claude จริงใน CI (มี budget) และเก็บ approve / edit rate เป็น dataset ปรับ prompt
 5. เก็บรูป / ไฟล์จาก LINE, รองรับ group, rich message / quick reply
 6. แยก image สำหรับ migrate ให้ image ของ `api` เล็กลง, อัปเกรด Prisma เมื่อมี patch ของ advisory
+7. ย้ายค่าตั้งค่า Railway เข้า repo ด้วย Infrastructure as Code (`.railway/railway.ts`) เพื่อ review / ย้อนได้เหมือนโค้ด
 
 ## เอกสาร
 
 | ไฟล์ | เนื้อหา |
 |---|---|
-| [docs/deploy-railway.md](docs/deploy-railway.md) | ขั้นตอน deploy, ตั้งค่า LINE OA, smoke test, รายการส่งงาน |
-| [docs/monitoring.md](docs/monitoring.md) | health, log, ตัวเลขที่ควร alert |
+| [docs/setup-guide.md](docs/setup-guide.md) | **คู่มือทีละขั้นสำหรับผู้เริ่มต้น**: เตรียมเครื่อง, รันบนเครื่อง, `ANTHROPIC_API_KEY`, LINE (จำลอง / LINE จริงผ่าน tunnel), deploy ครั้งแรกบน Railway, เมื่อมีการแก้ไข, แก้ปัญหา, เช็กลิสต์ส่งงาน |
+| [docs/monitoring.md](docs/monitoring.md) | monitoring notes: health, log ที่ระบบเขียน, ตัวเลขที่ควร alert |
 | [skills/crm-copilot/SKILL.md](skills/crm-copilot/SKILL.md) | AI skill: inputs / outputs / allowed actions / guardrails / failure behavior / eval cases |
 | [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) | แผน 6 phase, schema, endpoint และสิ่งที่เปลี่ยนจากแผนระหว่างทำ |
 | [docs/ai-usage-log.md](docs/ai-usage-log.md) | บันทึกการใช้ AI: prompt, สิ่งที่ AI ทำ, สิ่งที่คน review / reject |

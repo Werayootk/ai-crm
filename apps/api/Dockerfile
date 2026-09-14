@@ -14,10 +14,10 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 COPY skills/crm-copilot/package.json skills/crm-copilot/
-# store / cache ของ pnpm อยู่ใน cache mount → ไม่ติดไปกับ image (~850MB) และ build ซ้ำเร็วขึ้น
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm install --frozen-lockfile --filter @ai-crm/api...
+# ลบ store / cache ของ pnpm ในคำสั่งเดียวกับที่ติดตั้ง → ไม่ติดไปกับ image (~850MB)
+# ไม่ใช้ BuildKit cache mount: Railway รับเฉพาะ id แบบ s/<service id>-<path> ซึ่งต้องฝัง id ของ service ลงไฟล์
+RUN pnpm install --frozen-lockfile --filter @ai-crm/api... \
+    && rm -rf /root/.local/share/pnpm/store /root/.cache/pnpm
 COPY packages/shared packages/shared
 COPY skills/crm-copilot skills/crm-copilot
 COPY apps/api apps/api

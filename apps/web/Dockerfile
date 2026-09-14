@@ -9,9 +9,8 @@ COPY apps/web/package.json apps/web/
 COPY apps/api/package.json apps/api/
 COPY packages/shared/package.json packages/shared/
 COPY skills/crm-copilot/package.json skills/crm-copilot/
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    --mount=type=cache,id=pnpm-cache,target=/root/.cache/pnpm \
-    pnpm install --frozen-lockfile --filter @ai-crm/web...
+# ไม่ใช้ BuildKit cache mount (Railway รับเฉพาะ id แบบ s/<service id>-<path>) — stage นี้ไม่ไปถึง image สุดท้ายอยู่แล้ว
+RUN pnpm install --frozen-lockfile --filter @ai-crm/web...
 COPY packages/shared packages/shared
 COPY apps/web apps/web
 # rewrites ของ Next (/api/* → API) ถูกคำนวณตอน build → ต้องรู้ URL ของ API ตั้งแต่ขั้นนี้

@@ -2,8 +2,8 @@
 
 คู่มือสำหรับ Claude Code ในโปรเจกต์ **ai-crm** — อ่านให้ครบก่อนเริ่มงานทุกครั้ง
 
-> **สถานะปัจจุบัน:** Phase 1–6 เสร็จ (MVP ครบตามแผน) — เหลืองานที่ต้องใช้บัญชีผู้ใช้: push ขึ้น GitHub, deploy บน Railway, ตั้งค่า LINE OA, อัดวิดีโอ ดู [docs/deploy-railway.md](docs/deploy-railway.md) · ภาพรวมทั้งระบบ: [README.md](README.md) · monitoring: [docs/monitoring.md](docs/monitoring.md)
-> แผน: [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) · โจทย์: [docs/assignment.pdf](docs/assignment.pdf) (หน้า 1–3 JD, หน้า 4–5 โจทย์)
+> **สถานะปัจจุบัน:** Phase 1–6 เสร็จ (MVP ครบตามแผน) — เหลืองานที่ต้องใช้บัญชีผู้ใช้ (push ขึ้น GitHub, deploy บน Railway, ตั้งค่า LINE OA, อัดวิดีโอ) ตามคู่มือ `docs/setup-guide.md` · ภาพรวมระบบ: `README.md`
+> แผน: `docs/plans/2026-09-13-mvp-plan.md` · โจทย์: `docs/assignment.pdf` (หน้า 1–3 JD, หน้า 4–5 โจทย์)
 
 ## คำสั่งที่ใช้บ่อย (รันที่ root)
 
@@ -35,7 +35,7 @@ env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `a
 - ข้อมูลฝั่ง client ใช้ TanStack Query (`lib/queries.ts`); หลังแก้ lead เรียก `useInvalidateLeads()`; 401 ทุกที่ถูกพาไปหน้า login พร้อม `?next=` (ตรวจด้วย `safeNextPath` กัน open redirect)
 - filter ของหน้ารายการเก็บใน URL (refresh / แชร์ลิงก์ได้); หน้าที่ใช้ `useSearchParams` ต้องห่อด้วย `<Suspense>`
 - UI component เขียนเองบน element ของ browser (`<dialog>`, `<select>`) ใน `components/ui.tsx` — ไม่มี tailwind-merge จึงห้าม override ขนาด/ความกว้างด้วย className ให้เพิ่ม prop (เช่น `compact`) แทน
-- ตรวจ UI ใน browser จริงก่อนบอกว่าเสร็จ (Phase 3 ใช้ `playwright-core` + Chrome ในเครื่อง — ดู log #6)
+- ตรวจ UI ใน browser จริงก่อนบอกว่าเสร็จ — ใช้ skill `/run-ai-crm` (`.claude/skills/run-ai-crm/SKILL.md`): `stack.sh up` แล้วขับด้วย `driver.mjs` (Chrome จริงผ่าน `playwright-core`)
 
 ## แนวทางเขียน API (ใช้ตั้งแต่ Phase 2)
 
@@ -69,8 +69,11 @@ env: คัดลอก `apps/api/.env.example` → `apps/api/.env` และ `a
 
 - API ใช้ `helmet()` และไม่เปิด CORS; security header ของเว็บ (CSP แบบไม่ใช้ nonce, HSTS, X-Frame-Options ฯลฯ) อยู่ใน `apps/web/next.config.ts` — เพิ่ม script / รูป / font จาก origin อื่นต้องแก้ CSP และตรวจใน production build (dev มี `unsafe-eval`)
 - endpoint สาธารณะใหม่ต้องมี rate limit ต่อ IP (ดู `modules/public/public.routes.ts`) และห้ามบอกว่าข้อมูลมีอยู่ในระบบหรือไม่
-- log ใหม่ที่ควร alert ต้องเพิ่มในตารางของ [docs/monitoring.md](docs/monitoring.md); ตัวเลขสำหรับ monitor อยู่ใน `GET /api/ops/summary` (`modules/ops`)
+- log ใหม่ที่ควร alert ต้องเพิ่มในตารางของ `docs/monitoring.md`; ตัวเลขสำหรับ monitor อยู่ใน `GET /api/ops/summary` (`modules/ops`)
 - ก่อน commit: `pnpm audit --prod` ถ้ามีรายการใหม่ให้ตัดสินใจ (อัปเกรด / ยอมรับพร้อมเหตุผลใน README → Security)
+- แก้ขั้นตอนที่ผู้ใช้ต้องทำเอง (setup / deploy / ตัวแปร / LINE / API key) → อัปเดต `docs/setup-guide.md` ด้วย — ชื่อเมนูของเว็บผู้ให้บริการต้องตรวจจากเอกสารทางการ ไม่เขียนจากความจำ
+- **Railway ตั้งค่าผ่านหน้าเว็บ** (Config as Code / `railway.json` ใช้กับ service ใหม่ไม่ได้ — อย่าเพิ่มกลับ): Dockerfile path, pre-deploy, healthcheck, watch paths และตัวแปรอยู่ใน setup-guide ข้อ 5.4–5.5
+- Dockerfile ห้ามใช้ BuildKit cache mount (`RUN --mount=type=cache`) — Railway รับเฉพาะ id แบบ `s/<service id>-…` ที่ต้องฝัง id ของ service; ลบ cache ในคำสั่งเดียวกับที่ติดตั้งแทน
 
 ## ข้อควรรู้ของ stack (ตรวจแล้วตอน Phase 1)
 
@@ -163,7 +166,7 @@ packages/
 skills/
   crm-copilot/  workspace package: SKILL.md + prompt + runtime (Claude/mock provider, guardrails, กติกาสำรอง) + evals — depend แค่ shared ห้าม depend on Prisma
 docker/       init script ของ Postgres สำหรับ local
-docs/         โจทย์ แผน (docs/plans/) และ AI-usage log
+docs/         โจทย์, คู่มือ setup, monitoring notes, แผน (docs/plans/) และ AI-usage log
 ```
 
 - `apps/api` เป็นที่เดียวที่เข้าถึง database (ผ่าน Prisma) — `apps/web` ห้ามต่อ DB เอง
@@ -200,4 +203,5 @@ docs/         โจทย์ แผน (docs/plans/) และ AI-usage log
 
 - **แผน** เก็บที่ `docs/plans/YYYY-MM-DD-<หัวข้อ>.md` โดยใส่วันที่และสถานะ (Draft / Approved) ไว้ที่หัวไฟล์ — ห้ามเริ่มโค้ดของ phase ใดจนกว่าผู้ใช้จะสั่ง
 - **Git**: แต่ละ phase อยู่บน branch ของตัวเอง (`phase-<n>-<หัวข้อ>` แตกต่อจาก phase ก่อนหน้า) และ commit เมื่อผู้ใช้อนุมัติเท่านั้น — ไม่ commit ตรงเข้า `main`, ไม่ push เอง, ไม่ commit `docs/assignment.pdf`
-- **AI-usage log** — ทุก session ที่ใช้ AI ต้องต่อท้าย [docs/ai-usage-log.md](docs/ai-usage-log.md): วันเวลา (UTC+07:00 ดึงจาก transcript หรือเวลาไฟล์ ห้ามเดา), prompt ต้นฉบับ, สิ่งที่ AI ทำ, ผลลัพธ์, สิ่งที่คน review/reject และอัปเดตตาราง "Review / Reject" ท้ายไฟล์
+- **เอกสารสำหรับคน** มีแค่ README (ภาพรวม + ตาราง "เอกสาร" เป็นศูนย์รวมลิงก์), `docs/setup-guide.md`, `docs/monitoring.md`, `skills/crm-copilot/SKILL.md`, แผน และ AI-usage log — ไม่เพิ่มไฟล์ใหม่ถ้าใส่ในไฟล์เดิมได้; ลิงก์ข้ามไฟล์ใช้ระดับไฟล์เท่านั้น อ้างหัวข้อในไฟล์อื่นเป็นข้อความ (เช่น "setup-guide ข้อ 5.4") เพราะ anchor ภาษาไทยพังเงียบๆ เมื่อแก้หัวข้อ
+- **AI-usage log** — ทุก session ที่ใช้ AI ต้องต่อท้าย `docs/ai-usage-log.md`: วันเวลา (UTC+07:00 ดึงจาก transcript หรือเวลาไฟล์ ห้ามเดา), prompt ต้นฉบับ, สิ่งที่ AI ทำ, ผลลัพธ์, สิ่งที่คน review/reject และอัปเดตตาราง "Review / Reject" ท้ายไฟล์
