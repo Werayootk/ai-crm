@@ -149,3 +149,9 @@ apps/api/src/generated/
 next-env.d.ts
 # เอกสารโจทย์จากผู้สรรหา — ไม่เผยแพร่ใน repo (ลบบรรทัดนี้ถ้าต้องการ commit)
 docs/assignment.pdf
+# skill ของ Prisma CLI ที่สร้างทิ้งไว้ให้ AI agent — ไม่ใช่ source ของโปรเจกต์
+# (ระบุ apps/api/ เสมอ — `.claude/skills/run-ai-crm/` ที่ root อยู่ใน repo)
+apps/api/.agents/
+apps/api/.claude/
+apps/api/.windsurf/
+apps/api/skills-lock.json
