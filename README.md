@@ -15,7 +15,7 @@ Next.js 16 (`apps/web`) · Express 5 (`apps/api`) · Prisma 7 + PostgreSQL 17 ·
 | ฟอร์มสาธารณะ | `/contact-us` (ไม่ต้อง login) |
 | LINE | สแกน QR ของ OA (setup-guide ส่วนที่ 6) หรือทดลองในเครื่อง: แบบจำลองด้วย `pnpm line:simulate` / ทักจากมือถือจริงผ่าน tunnel (setup-guide ส่วนที่ 4) |
 | ข้อมูล | สังเคราะห์ทั้งหมด (seed แบบ fixed seed) — ไม่มีข้อมูลลูกค้าจริง |
-| วิธีทดลองทุกกรณี | [docs/demo-guide.md](docs/demo-guide.md) — CRM, AI Copilot, LINE OA, ฟอร์มเว็บ, admin และลำดับสำหรับวิดีโอ |
+| วิธีทดลองทุกกรณี | [docs/demo-guide.md](docs/demo-guide.md) — CRM, AI Copilot, LINE OA, ฟอร์มเว็บ, admin และสคริปต์วิดีโอ |
 
 ## ทำอะไรได้บ้าง
 
@@ -218,7 +218,7 @@ test สำคัญของ security ผ่าน mutation test แล้ว (
 | ไฟล์ | เนื้อหา |
 |---|---|
 | [docs/setup-guide.md](docs/setup-guide.md) | **คู่มือทีละขั้นสำหรับผู้เริ่มต้น**: เตรียมเครื่อง, รันบนเครื่อง, `ANTHROPIC_API_KEY`, LINE (จำลอง / LINE จริงผ่าน tunnel), deploy ครั้งแรกบน Railway, เมื่อมีการแก้ไข, แก้ปัญหา, เช็กลิสต์ส่งงาน |
-| [docs/demo-guide.md](docs/demo-guide.md) | **คู่มือทดลองใช้**: ทุกกรณีการใช้งานพร้อมผลที่ควรเห็น (CRM, AI Copilot, guardrails, LINE OA, ส่งไม่สำเร็จ / ส่งซ้ำ, admin) + ลำดับวิดีโอ 3–5 นาที |
+| [docs/demo-guide.md](docs/demo-guide.md) | **คู่มือทดลองใช้**: ทุกกรณีการใช้งานพร้อมผลที่ควรเห็น (CRM, AI Copilot, guardrails, LINE OA, ส่งไม่สำเร็จ / ส่งซ้ำ, admin) + สคริปต์วิดีโอ 3–5 นาที แบบพูดตามกดตาม |
 | [docs/monitoring.md](docs/monitoring.md) | monitoring notes: health, log ที่ระบบเขียน, ตัวเลขที่ควร alert |
 | [skills/crm-copilot/SKILL.md](skills/crm-copilot/SKILL.md) | AI skill: inputs / outputs / allowed actions / guardrails / failure behavior / eval cases |
 | [docs/plans/2026-09-13-mvp-plan.md](docs/plans/2026-09-13-mvp-plan.md) | แผน 6 phase, schema, endpoint และสิ่งที่เปลี่ยนจากแผนระหว่างทำ |
