@@ -329,9 +329,10 @@ pnpm --filter @ai-crm/crm-copilot eval      # ต้องจบด้วย "7/
 **เอา channel secret และ access token** — เข้า **LINE Developers Console** (https://developers.line.biz/console/) ด้วยบัญชีเดียวกัน → เลือก provider → เลือก channel ของ OA
 
 1. แท็บ **Basic settings** → คัดลอก **Channel secret**
-2. แท็บ **Messaging API** → หัวข้อ **Channel access token (long-lived)** → กด **Issue** → คัดลอก token
+2. แท็บ **Messaging API** → เลื่อนลงล่างสุด หัวข้อ **Channel access token (long-lived)** → กด **Issue** → คัดลอก token
+   - token ชนิดนี้ไม่มีวันหมดอายุ แต่**มีได้ทีละ 1 อัน** — กด **Reissue** เมื่อไร ตัวเดิมใช้ไม่ได้ทันที (ตอน reissue เลือกยืดอายุตัวเดิมได้ถึง 24 ชม.)
 
-**ปิดการตอบอัตโนมัติของ OA** — ในแท็บ **Messaging API** จะเห็น **Greeting messages** และ **Auto-reply messages** เป็น **Enabled** (ค่าเริ่มต้น) → กดแก้ไข ซึ่งจะพาไป LINE Official Account Manager → ตั้งทั้งสองเป็น **Disabled** (ไม่งั้น OA จะตอบลูกค้าเองซ้อนกับทีมขาย)
+**ปิดการตอบอัตโนมัติของ OA** — ในแท็บ **Messaging API** จะเห็น **Greeting messages** และ **Auto-reply messages** เป็น **Enabled** (ค่าเริ่มต้น) → กดแก้ไข ซึ่งจะพาไป LINE Official Account Manager → **Settings** → **Response settings** → ปิดทั้ง **Greeting message** และ **Auto-response** (ไม่งั้น OA จะตอบลูกค้าเองซ้อนกับทีมขาย) — รายละเอียดอยู่ในข้อ 6.3
 
 ### 4.3 ใส่ค่า LINE จริงในเครื่อง
 
@@ -660,40 +661,158 @@ Password: the SEED_DEMO_PASSWORD value in apps/api/.env
 
 ## 6. ต่อ LINE OA เข้า production
 
-ทำหลังข้อ 5.5 (ต้องมี URL ของเว็บแบบ HTTPS แล้ว) และต้องมี OA + channel secret / access token จาก[ข้อ 4.2](#42-สร้าง-line-official-account-และเอา-secret--token) (ถ้ายังไม่ได้ทำ ให้ทำข้อ 4.2 ก่อน — ไม่ต้องทำ 4.3–4.6)
+ทำหลังข้อ 5.5 (ต้องมี URL ของเว็บแบบ HTTPS แล้ว) และต้องมี OA + channel secret / access token จากข้อ 4.2 (ถ้ายังไม่มี ให้ทำข้อ 4.2 ก่อน — ไม่ต้องทำ 4.3–4.6)
 
-### 6.1 ใส่ใน Railway
+**ภาพรวม — มีค่าที่ต้องตั้ง 3 ที่ และต้องเป็นของ channel เดียวกันทั้งหมด**
 
-service **api** → **Variables** → แก้ / เพิ่ม 3 ตัว → กด **Deploy**:
-
-```env
-LINE_MODE=live
-LINE_CHANNEL_SECRET=<Channel secret>
-LINE_CHANNEL_ACCESS_TOKEN=<Channel access token>
+```mermaid
+flowchart LR
+  P[มือถือลูกค้า] -->|ทักหา OA| L[LINE Platform]
+  L -->|"POST /api/webhooks/line<br/>+ x-line-signature"| W["web (Railway)"]
+  W --> A["api — ตรวจลายเซ็นด้วย channel secret"]
+  A -->|"Push API + access token"| L
+  L --> P
 ```
 
-ตรวจ `https://<web-domain>/api/health` ต้องได้ `"line":"live"` (ถ้า `LINE_MODE=live` แต่ขาดตัวใดตัวหนึ่ง api จะไม่ยอม start — ดูใน Deploy Logs)
+| ที่ | ตั้งอะไร | ดูผลได้จาก |
+|---|---|---|
+| Railway → service `api` → Variables | `LINE_MODE=live`, `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN` | `/api/health` ขึ้น `"line":"live"` |
+| LINE Developers Console → แท็บ **Messaging API** | **Webhook URL** และสวิตช์ **Use webhook** | ข้อ 6.5 (ตรวจจาก terminal ได้) |
+| LINE Official Account Manager → **Settings** → **Response settings** | ปิด **Greeting message** และ **Auto-response** | ทักหา OA แล้วต้องไม่มีข้อความอัตโนมัติตอบ |
 
-### 6.2 ตั้ง webhook ให้ชี้ production
+- **channel secret** ใช้ตรวจว่า webhook ที่เข้ามาเป็นของจริง (ขาเข้า) · **access token** ใช้ส่งข้อความออก (ขาออก) — คนละตัว ผิดตัวใดตัวหนึ่งจะพังคนละด้าน
+- ถ้ามี OA / channel หลายตัว ต้องแน่ใจว่า secret + token + webhook URL เป็นของ channel เดียวกัน (ยืนยันด้วยข้อ 6.5)
 
-LINE Developers Console → channel → แท็บ **Messaging API** (ถ้าเคยชี้ไปที่ tunnel ในข้อ 4.5 ขั้นนี้คือการเปลี่ยนกลับมาที่ production):
+### 6.1 ตรวจฝั่งระบบเราก่อน
 
-1. **Webhook URL** → **Edit** → ใส่ `https://<web-domain>/api/webhooks/line` → **Update**
-2. กด **Verify** → ต้องขึ้น **Success**
-3. เปิด **Use webhook**
-4. (แนะนำ) เปิด webhook redelivery ถ้ามีตัวเลือก — ระบบกันข้อความซ้ำไว้แล้ว
-5. ตรวจว่าปิด Greeting / Auto-reply messages แล้ว (ท้ายข้อ 4.2)
+ทำ 2 ข้อนี้ให้ผ่านก่อน แล้วค่อยไปตั้งค่าในหน้าเว็บของ LINE
 
-### 6.3 ทดสอบจากมือถือ
+1. เปิด `https://<web-domain>/api/health` ต้องได้ `"status":"ok"`, `"db":"up"` และ **`"line":"live"`**
 
-1. แท็บ **Messaging API** มี **QR code** → เปิดแอป LINE สแกนเพื่อเพิ่มเพื่อน
+   | ผลที่ได้ | แปลว่า |
+   |---|---|
+   | `"line":"live"` | ตั้งค่าใน Railway ครบแล้ว ไปข้อ 6.2 ได้ |
+   | `"line":"mock"` | ยังไม่ได้ตั้ง `LINE_MODE=live` ใน service `api` (ตั้งแล้วต้องกด **Deploy** ที่แถบ staged changes) |
+   | เปิดไม่ขึ้น / 502 | api ไม่ได้ start — ดู **Deployments → Deploy Logs**: `Invalid environment variables` แปลว่า `LINE_MODE=live` แต่ขาด secret หรือ token |
+
+2. ยิงเข้า webhook ด้วยตัวเองแบบไม่มีลายเซ็น — **ต้องถูกปฏิเสธ** (แปลว่า endpoint ถูกที่และกำลังตรวจลายเซ็นอยู่จริง):
+
+   ```bash
+   curl -i -X POST https://<web-domain>/api/webhooks/line \
+     -H 'content-type: application/json' -d '{"events":[]}'
+   ```
+
+   | ผลที่ได้ | แปลว่า / ทำอะไรต่อ |
+   |---|---|
+   | **401** `INVALID_SIGNATURE` | ถูกต้อง ระบบพร้อมรับ LINE แล้ว → ไปข้อ 6.2 |
+   | **503** `SERVICE_UNAVAILABLE` | api ไม่มี `LINE_CHANNEL_SECRET` → ใส่ใน Railway แล้ว Deploy |
+   | **404** | URL ผิด — ต้องมี `/api/` นำหน้า และเป็น domain ของ service **web** (ตัวที่ Generate Domain ไว้) ไม่ใช่ของ api |
+   | ต่อไม่ติด | domain ผิด หรือ service ไม่ทำงาน |
+
+### 6.2 ตั้ง Webhook URL ใน LINE Developers Console
+
+1. เปิด https://developers.line.biz/console/ แล้ว login ด้วย **Business ID เดียวกับที่สร้าง OA**
+2. เลือก **provider** → เลือก **channel ของ OA** (ชนิด Messaging API ชื่อเดียวกับ OA)
+3. แท็บ **Messaging API** → เลื่อนหาหัวข้อ **Webhook settings**
+4. **Webhook URL** → **Edit** → วาง URL นี้ (เปลี่ยน `<web-domain>` เป็นของจริง) → **Update**
+
+   ```text
+   https://<web-domain>/api/webhooks/line
+   ```
+
+   - ต้องเป็น domain ของ service **web** บน Railway (เช่น `https://ai-crm-web-production.up.railway.app`)
+   - ต้องขึ้นต้น `https://`, มี `/api/webhooks/line` ครบ และ **ไม่มี** `/` ปิดท้าย
+
+5. กด **Verify** → ต้องขึ้น **Success**
+   LINE จะยิง POST ที่ไม่มี event มาที่ URL นี้ และรอรหัส 200 — ระบบเราตอบ 200 ให้อยู่แล้วเมื่อลายเซ็นถูกต้อง
+6. เปิดสวิตช์ **Use webhook** ← **ข้อที่ลืมกันบ่อยที่สุด** ถ้าไม่เปิด LINE จะไม่ส่งข้อความของลูกค้ามาเลย แม้ Verify จะผ่าน (คนละสวิตช์กัน)
+7. (แนะนำ) เปิด **Webhook redelivery** — ถ้าระบบเราตอบไม่สำเร็จชั่วคราว LINE จะส่ง event ซ้ำให้ภายหลัง (ระบบกันบันทึกซ้ำไว้แล้ว)
+8. (แนะนำ) เปิด **Error statistics aggregation** — จะมีแท็บ **Webhook errors** ให้ดูว่า LINE ยิงมาแล้วเจอ error อะไรบ้าง
+
+### 6.3 ปิดข้อความตอบอัตโนมัติของ OA
+
+เปิด **LINE Official Account Manager** (https://manager.line.biz) → เลือก OA → **Settings (ตั้งค่า)** → **Response settings (การตอบกลับ)**
+
+- **Greeting message** (ข้อความทักทายเพื่อนใหม่) → **ปิด**
+- **Auto-response** (ตอบกลับอัตโนมัติ) → **ปิด**
+- **Chat** จะเปิดไว้ก็ได้ — ตั้งแต่ 30 พ.ย. 2022 LINE ให้ใช้ webhook พร้อมกับแชทได้ ไม่มีโหมด Bot / Chat ให้เลือกแล้ว
+
+ไม่ปิด 2 อันแรก ลูกค้าจะได้ข้อความอัตโนมัติของ LINE ซ้อนกับคำตอบที่ทีมขายอนุมัติ
+
+### 6.4 ทดสอบจากมือถือ
+
+1. LINE Developers Console → แท็บ **Messaging API** → **QR code** → เปิดแอป LINE บนมือถือสแกนเพื่อ **เพิ่มเพื่อน**
 2. ส่งข้อความหา OA เช่น "สนใจทำเว็บไซต์ครับ"
-3. ในเว็บ production: **Leads** → กรองที่มา **LINE OA** → lead ใหม่ที่ยังไม่มีเจ้าของ → เห็นข้อความ + การ์ด AI "รออนุมัติ"
-4. แก้ข้อความได้ → **อนุมัติและส่งทาง LINE** → ข้อความต้องเด้งเข้ามือถือ
-5. ลองพิมพ์ตอบเองในช่อง **ตอบลูกค้าทาง LINE** ด้วย
-6. เก็บภาพ QR code ไว้ส่งผู้ประเมิน — อย่าเอา webhook ของ OA ตัวนี้ไปชี้ tunnel อีก (ใช้ OA แยกสำหรับทดสอบบนเครื่อง)
+3. ภายในไม่กี่วินาที ควรเห็นทั้ง 3 อย่างนี้:
 
-ข้อความไม่ขึ้น / ส่งไม่ถึง → [ข้อ 8 หัวข้อ LINE](#line)
+   | ที่ไหน | ควรเห็นอะไร |
+   |---|---|
+   | เว็บ production → **Leads** → ที่มา **LINE OA** | lead ใหม่ **"ติดต่อผ่าน LINE — <ชื่อ LINE ของคุณ>"** ยังไม่มีผู้รับผิดชอบ |
+   | หน้า lead นั้น | ข้อความของคุณใน Timeline + การ์ด AI "รออนุมัติ" พร้อมบรรทัด "ร่างอัตโนมัติเมื่อลูกค้าทักเข้ามาทาง LINE" |
+   | Railway → service `api` → **Deployments** → log | `line webhook received` แล้วตามด้วย `contact created from line user` และ `line message recorded` |
+
+4. แก้ข้อความในการ์ดได้ → **อนุมัติและส่งทาง LINE** → ข้อความต้องเด้งเข้ามือถือ
+5. ลองพิมพ์ตอบเองในช่อง **ตอบลูกค้าทาง LINE** ด้วย
+6. เก็บภาพ QR code ไว้ส่งผู้ประเมิน — และอย่าเอา webhook ของ OA ตัวนี้ไปชี้ tunnel อีก (ถ้าจะทดสอบบนเครื่องต่อ ให้สร้าง OA แยกตามข้อ 4.2)
+
+รายละเอียดว่าทดลองอะไรได้บ้างหลังจากนี้ (ทักหลายข้อความ, ส่งสติกเกอร์, ปิด lead แล้วทักใหม่ ฯลฯ) อยู่ใน `docs/demo-guide.md`
+
+### 6.5 ยังไม่ทำงาน — ตรวจจาก terminal
+
+ใช้ **access token ตัวเดียวกับที่ใส่ใน Railway** ถามตรงไปที่ LINE ว่าเก็บค่าอะไรไว้ (ไม่ต้องเดาจากหน้าเว็บ)
+
+```bash
+read -rs "TOKEN?วาง LINE_CHANNEL_ACCESS_TOKEN แล้วกด Enter: "; echo
+
+# 1) LINE เก็บ webhook URL อะไรไว้ และเปิดใช้หรือยัง
+curl -s -H "Authorization: Bearer $TOKEN" https://api.line.me/v2/bot/channel/webhook/endpoint
+
+# 2) สั่งให้ LINE ลองยิง webhook มาที่ระบบเราเดี๋ยวนี้
+curl -s -X POST -H "Authorization: Bearer $TOKEN" https://api.line.me/v2/bot/channel/webhook/test
+
+# 3) token นี้เป็นของ OA ตัวไหน (ชื่อและ id ของ OA)
+curl -s -H "Authorization: Bearer $TOKEN" https://api.line.me/v2/bot/info
+```
+
+ผลที่ถูกต้องคือ `{"endpoint":"https://<web-domain>/api/webhooks/line","active":true}` และ `{"success":true,"statusCode":200,...}`
+
+| ผลที่ได้ | แปลว่า | แก้ที่ |
+|---|---|---|
+| `401` / `Authentication failed` | access token ผิด หมดอายุ หรือเป็นของ channel อื่น | ออก token ใหม่ (แท็บ Messaging API) → อัปเดตใน Railway → **Deploy** |
+| `endpoint` ไม่ใช่ URL ของเรา | ตั้ง Webhook URL ผิดช่องหรือผิด channel | ข้อ 6.2 ขั้นที่ 4 |
+| `"active": false` | ยังไม่ได้เปิด **Use webhook** | ข้อ 6.2 ขั้นที่ 6 |
+| `404` `Webhook endpoint not found` | ยังไม่ได้ตั้ง Webhook URL เลย | ข้อ 6.2 |
+| `"success": false` + `"statusCode": 401` | LINE ยิงถึงระบบแล้ว แต่ **channel secret ใน Railway ไม่ตรงกับ channel นี้** (เช่นคัดลอกของ channel อื่น หรือ reissue แล้วยังไม่อัปเดต) | คัดลอก Channel secret จากแท็บ **Basic settings** ของ channel เดียวกัน → Railway → **Deploy** |
+| `"success": false` + `"statusCode": 503` | api ไม่มี `LINE_CHANNEL_SECRET` | ใส่ใน Railway → **Deploy** |
+| `"success": false` + `"statusCode": 404` | URL ไม่มี `/api/` หรือชี้ไป domain ผิด | ข้อ 6.2 ขั้นที่ 4 |
+| `"success": false` + `502` / `504` / timeout | service ไม่ตอบ (กำลัง deploy อยู่ หรือ healthcheck ไม่ผ่าน) | ดู Deploy Logs ของ `api` และ `web` |
+
+**กด Verify แล้วขึ้น `401 Unauthorized`** — LINE ยิงถึงระบบเราแล้ว (URL และ service ถูกต้อง) แต่ลายเซ็นไม่ผ่าน = `LINE_CHANNEL_SECRET` ใน Railway ไม่ใช่ของ channel ที่กด Verify อยู่ แยกสาเหตุด้วยคำสั่งนี้ (ใช้ **Channel secret ที่เห็นในแท็บ Basic settings ตอนนี้**):
+
+```bash
+read -rs "SECRET?วาง Channel secret จากแท็บ Basic settings แล้วกด Enter: "; echo
+BODY='{"destination":"U0","events":[]}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -binary | base64)
+curl -s -w ' <- HTTP %{http_code}\n' -X POST https://<web-domain>/api/webhooks/line \
+  -H 'content-type: application/json' -H "x-line-signature: $SIG" -d "$BODY"
+```
+
+(ส่ง event เปล่า ไม่มีการบันทึกข้อมูลใดๆ)
+
+| ผลที่ได้ | แปลว่า | แก้ยังไง |
+|---|---|---|
+| **200** `{"received":0,...}` | secret ที่เพิ่งวาง **ตรง** กับที่ deploy อยู่ → แปลว่ากำลังกด Verify บน **channel คนละตัว** กับเจ้าของ secret นี้ | ยืนยันว่า token / secret เป็นของ OA ไหนด้วย `GET /v2/bot/info` แล้วไปตั้ง Webhook URL ใน channel นั้น |
+| **401** | ค่าใน Railway ไม่ใช่ค่านี้ (คัดลอกผิดช่อง / reissue แล้วยังไม่อัปเดต / ยังไม่ได้กด Deploy) | คัดลอก **Channel secret** (32 ตัว a–f 0–9) จากแท็บ **Basic settings** → Railway service `api` → Variables → **Deploy** → รอ deploy เสร็จ → กด Verify ใหม่ |
+
+ค่าที่คัดลอกต้องเป็น **Channel secret** ไม่ใช่ **Channel ID** (ตัวเลขล้วน) และไม่ใช่ **Channel access token** (ยาวกว่ามาก) — และต้องเป็น channel ชนิด **Messaging API** ไม่ใช่ LINE Login
+
+ตรวจฝั่งเราเพิ่ม (ทำหลังทักจากมือถือแล้ว):
+
+- Railway → service `api` → **Deployments** → deployment ล่าสุด → log
+  - ไม่มี `line webhook received` เลย = LINE ยังยิงมาไม่ถึง → กลับไปข้อ 6.5 ข้อ 1–2
+  - มี `line webhook rejected: invalid signature` = ยิงถึงแล้วแต่ secret ไม่ตรง
+- login เป็น `admin@demo.local` แล้วเปิด `https://<web-domain>/api/webhook-events?status=FAILED` → ดู `lastError` ของ event ที่ประมวลผลไม่ผ่าน (ระบบลองซ้ำเองที่ 1 / 5 / 15 / 60 นาที และสั่งใหม่ได้)
+- ข้อความเข้าระบบแล้วแต่ **ส่งกลับไม่ถึงมือถือ** → ดูข้อความใต้ bubble สีแดงในหน้า lead: `401` = access token ผิด / หมดอายุ, `429` = โควตาข้อความของ OA เต็มในรอบบิลนั้น, `400` = ผู้ใช้ LINE ปลายทางไม่มีจริง (เช่น lead จากข้อมูลตัวอย่าง) → แก้แล้วกด **ส่งอีกครั้ง**
 
 ---
 
@@ -746,7 +865,7 @@ gh pr merge --merge --delete-branch         # รวมเข้า main
 | secret | ทำอย่างไร | ผลข้างเคียง |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | สร้าง key ใหม่ → ใส่ใน Railway → Deploy → Delete key เก่าในหน้า API keys | ไม่มี |
-| `LINE_CHANNEL_ACCESS_TOKEN` | ออก token ใหม่ในแท็บ Messaging API → ใส่ใน Railway → Deploy | ไม่มี |
+| `LINE_CHANNEL_ACCESS_TOKEN` | แท็บ **Messaging API** → **Channel access token (long-lived)** → **Reissue** → ใส่ใน Railway → **Deploy** | token เดิมใช้ไม่ได้ทันทีที่ reissue (มีได้ทีละ 1) — ระหว่างรอ deploy ส่งข้อความออกไม่ได้ (ตอน reissue เลือกยืดอายุตัวเดิม 24 ชม. ได้) |
 | `LINE_CHANNEL_SECRET` | ออกใหม่ในแท็บ Basic settings → ใส่ใน Railway → Deploy **ทันที** | ระหว่างที่ค่าไม่ตรง webhook จะถูกปฏิเสธ (401) |
 | `JWT_SECRET` | สร้างใหม่ด้วย `openssl rand -base64 48` → ใส่ใน Railway → Deploy | ทุกคนถูก logout ต้อง login ใหม่ |
 
@@ -801,9 +920,9 @@ deploy แล้วพัง → service → แท็บ **Deployments** → �
 
 | อาการ | สาเหตุ / วิธีแก้ |
 |---|---|
-| กด Verify แล้วไม่ Success | URL ผิด (ต้องเป็น `https://<web-domain>/api/webhooks/line`) หรือ api ยังไม่มี `LINE_CHANNEL_SECRET` (ตอบ 503) |
-| ส่งข้อความจากมือถือแล้วไม่ขึ้นในระบบ | ยังไม่เปิด **Use webhook** · ดู Deploy Logs ของ api: ไม่มี `line webhook received` = LINE ยังเรียกไม่ถึง, มี `line webhook rejected: invalid signature` = channel secret ไม่ตรง |
-| ข้อความเข้าแล้วแต่ OA ตอบเองด้วยข้อความอัตโนมัติ | ยังไม่ได้ปิด Greeting / Auto-reply messages (ท้ายข้อ 4.2) |
+| กด Verify แล้วไม่ Success | URL ผิด (ต้องเป็น `https://<web-domain>/api/webhooks/line` และเป็น domain ของ service `web`) หรือ api ยังไม่มี `LINE_CHANNEL_SECRET` (ตอบ 503) → หาสาเหตุตามข้อ 6.5 |
+| ส่งข้อความจากมือถือแล้วไม่ขึ้นในระบบ | ส่วนใหญ่คือยังไม่เปิดสวิตช์ **Use webhook** (Verify ผ่านไม่ได้แปลว่าเปิดแล้ว) — ตรวจด้วย `GET /v2/bot/channel/webhook/endpoint` ต้องได้ `"active":true` (ข้อ 6.5) · ดู Deploy Logs ของ api: ไม่มี `line webhook received` = LINE ยังเรียกไม่ถึง, มี `line webhook rejected: invalid signature` = channel secret ไม่ตรงกับ channel นั้น |
+| ข้อความเข้าแล้วแต่ OA ตอบเองด้วยข้อความอัตโนมัติ | ยังไม่ได้ปิด Greeting message / Auto-response ใน LINE Official Account Manager → Settings → Response settings (ข้อ 6.3) |
 | (บนเครื่อง) กด Verify ไม่ Success / ทักแล้วไม่ขึ้น | Terminal ของ `cloudflared` ถูกปิด หรือเปิดใหม่แล้ว URL เปลี่ยน (แก้ Webhook URL ตามข้อ 4.5) · `pnpm dev` ไม่ได้รันอยู่ · ยังไม่ได้ restart หลังแก้ `.env` · ตรวจด้วยการเปิด `https://<คำสุ่ม>.trycloudflare.com/api/health` |
 | (บนเครื่อง) `cloudflared` ไม่ขึ้น URL `trycloudflare.com` | มีไฟล์ `~/.cloudflared/config.yaml` อยู่ — เปลี่ยนชื่อไฟล์ชั่วคราวแล้วรันใหม่ |
 | (บนเครื่อง) เปิด URL ของ tunnel แล้วเจอ `{"error":{"code":"NOT_FOUND"…}}` | ปกติ — tunnel ชี้ไปที่ api (ไม่ใช่หน้าเว็บ) ใช้หน้าเว็บที่ http://localhost:3000 |
