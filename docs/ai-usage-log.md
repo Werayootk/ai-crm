@@ -480,6 +480,32 @@
 
 ---
 
+### #16 · 2026-09-16 14:15 — เขียนขั้นตอนต่อ LINE OA เข้า production ให้ละเอียด
+
+**Prompt**
+
+> ผม deploy ไปหมดแล้วแต่ไม่แน่ใจวิธีการตั้งค่า LINE OA และการใช้กลับระบบเรา ช่วยเขียนแบบระเอียดที ตอนนี้ติดปัญหา
+> เบื้องต้น /api/health ได้ {"status":"ok","db":"up","ai":"claude","line":"live",…}
+> ไม่แน่ใจว่า set line oa บนเว็บตั้งค่าอย่างไร และบนระบบเราต้องทำอะไรก่อนบ้าง
+
+**สิ่งที่ AI ทำ (14:15–14:35)**
+
+- อ่าน health ที่ผู้ใช้ส่งมา → ฝั่ง Railway ครบแล้ว (`"line":"live"` = มีทั้ง secret และ token) เหลือฝั่งหน้าเว็บของ LINE
+- ตรวจเอกสาร LINE ก่อนเขียน (ไม่เขียนจากความจำ): สวิตช์ **Use webhook** อยู่ในแท็บ Messaging API, ปุ่ม **Verify** แค่ยิง POST เปล่ามาและรอรหัส 200 (คนละอย่างกับ Use webhook), Response Mode (Bot / Chat) ถูกยกเลิกตั้งแต่ 30 พ.ย. 2022, มี **Webhook redelivery** และ **Error statistics aggregation** + แท็บ Webhook errors
+- ตรวจ API ที่ใช้หาสาเหตุได้จาก terminal: `GET /v2/bot/channel/webhook/endpoint` (บอก URL ที่ LINE เก็บไว้ + `active`), `POST /v2/bot/channel/webhook/test` (สั่งให้ LINE ยิงมาเดี๋ยวนี้ พร้อม `statusCode` ที่ได้), `GET /v2/bot/info` (token เป็นของ OA ไหน)
+- เขียนข้อ 6 ของ setup-guide ใหม่ทั้งหัวข้อ: แผนภาพว่าสวิตช์อยู่ 3 ที่ (Railway / Developers Console / OA Manager) และต้องเป็น channel เดียวกัน → 6.1 ตรวจฝั่งเราก่อนด้วย health + `curl` เข้า webhook แบบไม่มีลายเซ็นแล้วต้องได้ 401 (503 = ไม่มี secret, 404 = URL ผิด) → 6.2 ตั้ง Webhook URL / Verify / **Use webhook** / redelivery / error statistics → 6.3 ปิด Greeting / Auto-response ใน Response settings → 6.4 ทดสอบจากมือถือพร้อมตารางว่าควรเห็นอะไรใน 3 ที่ → 6.5 ตารางแปลผล 8 กรณีจาก API ของ LINE + วิธีอ่าน log ของ api
+- อัปเดตข้อ 4.2 และตาราง LINE ในส่วนที่ 8 ให้ชี้มาที่ขั้นตอนใหม่
+
+**อาการจริงที่ผู้ใช้แจ้งต่อมา (14:40)** — กด Verify แล้วได้ `The webhook returned an HTTP status code other than 200.(401 Unauthorized)` = LINE ยิงถึงระบบแล้วแต่ลายเซ็นไม่ผ่าน (URL / service ถูกต้อง) → สาเหตุคือ `LINE_CHANNEL_SECRET` ใน Railway ไม่ใช่ของ channel ที่กด Verify
+
+- ตรวจโค้ด: `optionalSecret` ทำ `.trim()` อยู่แล้ว (ช่องว่างหัวท้ายไม่ใช่สาเหตุ) และ `LINE_MODE=live` บังคับให้มีทั้ง secret และ token ไม่งั้น api ไม่ start → แปลว่ามีค่าอยู่แต่เป็นค่าผิด
+- เขียนคำสั่งแยกสาเหตุ (เซ็น event เปล่าด้วย secret ที่ผู้ใช้เห็นในหน้า Basic settings แล้วยิงเข้า production): 200 = กด Verify ผิด channel, 401 = ค่าใน Railway ไม่ใช่ค่านี้ — **ทดสอบคำสั่งกับ stack ในเครื่องผ่านเส้นทางเดียวกับ production (web → rewrite → api) แล้ว**: secret ถูก → 200 `{"received":0,"duplicates":0}`, secret ผิด / ไม่มีลายเซ็น → 401
+- เพิ่มหัวข้อนี้ลง setup-guide ข้อ 6.5
+
+**Human review** — ยังไม่ commit รอผู้ใช้ตรวจ
+
+---
+
 ## Review / Reject / การเปลี่ยนแปลงหลัง human inspection
 
 | วันเวลา | สิ่งที่ AI เสนอ | การตัดสินใจของคน | ผลที่เปลี่ยนไป |
