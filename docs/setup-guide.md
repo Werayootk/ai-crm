@@ -14,7 +14,7 @@
 | [8. แก้ปัญหาที่พบบ่อย](#8-แก้ปัญหาที่พบบ่อย) | อาการ → วิธีแก้ | — |
 
 > **ตรวจสอบแล้วแค่ไหน (2026-09-14):**
-> - ส่วนที่ 2 ทดสอบจริงโดย `git clone` repo ใหม่บน macOS แล้วทำตามทีละขั้นจนเข้าเว็บได้; ข้อ 4.1 และกรณี API key ผิดในส่วนที่ 3 / 8 ทดสอบในเครื่องเดียวกัน; image ที่ใช้ deploy build และรันผ่านในเครื่อง
+> - ส่วนที่ 2 ทดสอบจริงโดย `git clone` repo ใหม่บน macOS แล้วทำตามทีละขั้นจนเข้าเว็บได้; ข้อ 4.1 และกรณี API key ผิดในส่วนที่ 3 / 8 ทดสอบในเครื่องเดียวกัน; image ที่ใช้ deploy build และรันผ่านในเครื่อง; ขั้นที่ 3 ของข้อ 5.6 (คำสั่ง seed และข้อความ error ในตาราง) ทดสอบกับฐานข้อมูลทดลองในเครื่อง
 > - ข้อ 4.4 (Quick Tunnel) ทดสอบจริง: เปิด tunnel ไปที่ api บนเครื่อง แล้วส่ง webhook ที่เซ็นแบบ LINE ผ่าน URL `https://….trycloudflare.com` — ข้อความถูกบันทึก, event ซ้ำถูกข้าม, ลายเซ็นผิดได้ 401, คำขอแบบปุ่ม Verify (`events: []`) ได้ 200; ส่วนที่ต้องใช้บัญชี LINE จริง (ข้อ 4.2, 4.5, 4.6) ยังไม่ได้ลอง
 > - คำสั่งติดตั้งโปรแกรมในส่วนที่ 1 มาจากเอกสารทางการของแต่ละโปรแกรม (เครื่องที่ทดสอบติดตั้งไว้แล้ว จึงไม่ได้รันซ้ำ)
 > - ส่วนที่ 3, 5 และ 6 เป็นหน้าเว็บของผู้ให้บริการ ชื่อเมนูยึดตามเอกสารทางการของ Anthropic / Railway / LINE ณ วันที่เขียน แต่**ยังไม่ได้ลองกับบัญชีจริง** (ยกเว้นขั้น import repo ในข้อ 5.4 ที่ลองจริงแล้ว — Railway แยก service ตาม package จึงปรับข้อ 5.4–5.5 ตามที่เจอ) — ถ้าหน้าตาเว็บเปลี่ยน ให้มองหาคำที่ใกล้เคียง
@@ -565,19 +565,81 @@ JWT_SECRET=x docker compose -f docker-compose.prod.yml stop
 
 ### 5.6 ใส่ข้อมูล demo (ทำครั้งเดียว)
 
-ฐานข้อมูลบน Railway ยังว่าง ต้อง seed จากเครื่องเรา — ต้องเปิดทางเข้าชั่วคราว
+ตอนนี้ฐานข้อมูลบน Railway มีตารางแล้ว (Pre-deploy ของ api สร้างให้ในข้อ 5.5) แต่ยังไม่มีข้อมูล จึงยัง login ไม่ได้ — ขั้นนี้รันสคริปต์ seed **จากเครื่องเรา** ส่งข้อมูลสมมติ (user 20 คน, lead 450 รายการ ฯลฯ) ขึ้นไป โดยเปิดทางเข้าฐานข้อมูลจากอินเทอร์เน็ต**ชั่วคราว** แล้วปิดทันทีเมื่อเสร็จ ใช้เวลาประมาณ 10 นาที
 
-1. คลิก service **Postgres** → **Settings → Networking** → เพิ่ม **Public Access** (Railway สร้าง TCP Proxy และตัวแปร `DATABASE_PUBLIC_URL`)
-2. **Postgres → Variables** → คัดลอกค่า `DATABASE_PUBLIC_URL`
-3. ในเครื่อง (ในโฟลเดอร์โปรเจกต์) — ตั้งรหัสผ่าน demo ใหม่สำหรับ production (≥ 12 ตัว **จดไว้ ใช้ส่งให้ผู้ประเมิน**):
+**ก่อนเริ่ม ตรวจให้ครบ**
 
-   ```bash
-   DATABASE_URL='<วาง DATABASE_PUBLIC_URL>' SEED_DEMO_PASSWORD='<รหัสผ่าน demo ของ production>' \
-     ALLOW_PRODUCTION_SEED=true NODE_ENV=production pnpm db:seed
-   ```
+- [ ] ข้อ 5.5 ผ่านแล้ว: log ขั้น Pre-deploy ของ api มี `All migrations have been successfully applied.` (ถ้ายังไม่ผ่าน seed จะล้มเพราะยังไม่มีตาราง)
+- [ ] เครื่องนี้เคยทำส่วนที่ 2 แล้ว (อย่างน้อยข้อ 2.1–2.4 และ `pnpm db:generate`) — ไม่ต้องเปิด Docker เพราะขั้นนี้ต่อฐานข้อมูลบน Railway
+- [ ] คิดรหัสผ่าน demo ของ production ไว้แล้ว: อย่างน้อย 12 ตัว **ไม่ใช้ค่าเดียวกับในเครื่อง** และจดไว้ (ต้องส่งให้ผู้ประเมิน) — ทุกบัญชี demo ใช้รหัสนี้
 
-   ต้องจบด้วย `The seed command has been executed.` (seed ไม่ยอมรันกับ production ถ้าไม่มี `ALLOW_PRODUCTION_SEED=true` และไม่ยอมเขียนทับฐานข้อมูลที่มีข้อมูลแล้ว)
-4. **ปิด Public Access คืน** (Postgres → Settings → Networking → กดไอคอนถังขยะที่ TCP Proxy) — ลดความเสี่ยงและค่า network
+**ขั้นที่ 1 — เปิดทางเข้าฐานข้อมูลชั่วคราว**
+
+1. คลิก service **Postgres** → แท็บ **Settings** → หัวข้อ **Networking** → เพิ่ม **Public Access**
+2. Railway สร้าง TCP Proxy (ที่อยู่แบบ `<ชื่อ>.proxy.rlwy.net:<พอร์ต>`) และเติมค่าให้ตัวแปร `DATABASE_PUBLIC_URL` — ถ้ามีแถบ **staged changes** ขึ้น ให้กด **Deploy**
+
+**ขั้นที่ 2 — คัดลอก URL ของฐานข้อมูล**
+
+1. service **Postgres** → แท็บ **Variables** → แถว **`DATABASE_PUBLIC_URL`** → คัดลอกค่า
+2. ตรวจว่าคัดลอกถูกตัว — ค่าต้อง:
+   - ขึ้นต้นด้วย `postgresql://` และมี `.proxy.rlwy.net:` ตามด้วยพอร์ต
+   - **ไม่ใช่** `…@postgres.railway.internal…` (นั่นคือ `DATABASE_URL` ใช้ได้เฉพาะภายใน Railway)
+   - **ไม่มี** `${{` (นั่นคือแม่แบบ ยังไม่ใช่ค่าจริง)
+3. ในค่านี้มีรหัสผ่านของฐานข้อมูล — ห้ามส่งในแชต / แปะในเอกสาร
+
+**ขั้นที่ 3 — รัน seed จากเครื่อง**
+
+เปิด Terminal → `cd` เข้าโฟลเดอร์โปรเจกต์ → คัดลอกไปวาง**ทีละบรรทัด** แล้วกด Enter:
+
+```bash
+read -rs "DB_URL?วาง DATABASE_PUBLIC_URL แล้วกด Enter: "; echo
+read -r "DEMO_PW?ตั้งรหัสผ่าน demo ของ production (อย่างน้อย 12 ตัว) แล้วกด Enter: "
+DATABASE_URL="$DB_URL" SEED_DEMO_PASSWORD="$DEMO_PW" ALLOW_PRODUCTION_SEED=true NODE_ENV=production pnpm db:seed
+```
+
+- บรรทัดที่ 1: ตอนวาง URL **จะไม่เห็นอะไรขึ้นบนจอ** (ซ่อนรหัสผ่านของฐานข้อมูลไว้) เป็นเรื่องปกติ — วางครั้งเดียวแล้วกด Enter
+- บรรทัดที่ 2: พิมพ์รหัสผ่าน demo (เห็นบนจอ ตรวจให้ถูกก่อนกด Enter) — ใช้อักขระพิเศษได้ทุกตัว
+- บรรทัดที่ 3: ส่งข้อมูลขึ้น Railway — `ALLOW_PRODUCTION_SEED=true` คือการยืนยันว่าตั้งใจใส่ข้อมูลลงฐานข้อมูล production (ไม่ใส่จะถูกปฏิเสธ) ใช้เวลาไม่กี่วินาที
+- ใช้ `read` แทนการแก้คำสั่งเอง: ไม่ต้องระวังเครื่องหมายคำพูด และค่าลับไม่ถูกบันทึกในประวัติคำสั่งของ Terminal
+- ใช้ bash (เช่น WSL) แทน zsh ของ macOS: เปลี่ยน 2 บรรทัดแรกเป็น `read -rsp "วาง DATABASE_PUBLIC_URL: " DB_URL; echo` และ `read -rp "รหัสผ่าน demo: " DEMO_PW`
+
+ผลที่ต้องเห็น (ตัวเลขต้องตรง):
+
+```text
+Seeded 20 users, 150 companies, 2000 contacts, 450 leads, 2041 activities, 577 messages.
+Demo logins: admin@demo.local, sales01@demo.local … sales19@demo.local
+Password: the SEED_DEMO_PASSWORD value in apps/api/.env
+🌱  The seed command has been executed.
+```
+
+บรรทัด `Password:` หมายถึงรหัสที่ใช้ตอนรัน — ของ production คือค่าที่พิมพ์ในบรรทัดที่ 2 **ไม่ใช่**ค่าใน `apps/api/.env` ของเครื่องเรา
+
+ข้อมูลทั้งหมดถูกใส่ในคราวเดียว — ถ้าล้มกลางทาง (เช่นเน็ตหลุด) จะไม่มีข้อมูลค้างครึ่งๆ แก้สาเหตุแล้วรันบรรทัดที่ 3 ซ้ำได้เลย (ถ้าปิด Terminal ไปแล้ว เริ่มจากบรรทัดที่ 1 ใหม่)
+
+**ขั้นที่ 4 — ตรวจว่า login ได้ (ก่อนปิดทางเข้า)**
+
+เปิด `https://<web-domain>` → login ด้วย `sales01@demo.local` + รหัสจากขั้นที่ 3 → ต้องเห็น **Leads 450 รายการ** — ถ้าไม่ได้ ดูตารางด้านล่าง (ตอนนี้ทางเข้ายังเปิดอยู่ แก้ได้ทันที)
+
+**ขั้นที่ 5 — ปิดทางเข้าคืน (ห้ามข้าม)**
+
+1. service **Postgres** → **Settings** → **Networking** → กดไอคอน**ถังขยะ**ที่ TCP Proxy (ถ้ามีแถบ staged changes ให้กด **Deploy**)
+2. สั่ง `unset DB_URL DEMO_PW` ใน Terminal (หรือปิดหน้าต่าง Terminal นั้น)
+
+ระหว่างที่เปิด ใครได้ URL ไปก็เข้าฐานข้อมูลได้ตรงๆ และ Railway คิดค่า network ของ TCP Proxy — ปิดแล้ว api ยังทำงานปกติ เพราะ api ต่อฐานข้อมูลผ่านเครือข่ายภายใน (`DATABASE_URL`) ไม่ได้ใช้ทางนี้
+
+**ถ้าขึ้น error** — ข้อความจริงอยู่ใต้บรรทัด `Running seed command …` (บรรทัด `ERR_PNPM_…` / `ELIFECYCLE` ด้านล่างเป็นแค่ผลตามมา)
+
+| ข้อความ | สาเหตุ / วิธีแก้ |
+|---|---|
+| `Database already has data…` | seed ไปแล้ว ข้อมูลอยู่ครบ ไม่ต้องทำซ้ำ — ถ้าต้องการล้างแล้ว seed ใหม่จริงๆ ให้เติม ` -- --reset` ท้ายบรรทัดที่ 3 (**ข้อมูลบน production หายทั้งหมด** รวมข้อความ LINE ที่ทดสอบไว้) |
+| `Can't reach database server at postgres.railway.internal` | คัดลอก `DATABASE_URL` มาผิดตัว → กลับไปขั้นที่ 2 คัดลอก `DATABASE_PUBLIC_URL` |
+| `Can't reach database server at …proxy.rlwy.net` หรือ ``Invalid `prisma.user.count()` invocation:`` ที่ไม่มีข้อความต่อ | ต่อไม่ติด: ยังไม่ได้เปิด Public Access / ยังไม่กด Deploy staged changes / ปิดไปแล้ว → ทำขั้นที่ 1 ใหม่ (URL อาจเปลี่ยน ให้คัดลอกใหม่) |
+| `Invalid URL` | ค่าที่วางเป็นแม่แบบ `${{…}}` หรือไม่ใช่ URL → คัดลอกใหม่ |
+| `Authentication failed against the database server…` หรือ `Database … does not exist…` | URL ถูกตัดขาด / มีตัวเกิน (คัดลอกไม่ครบ) → คัดลอกใหม่ |
+| ``The table `public.User` does not exist…`` | api ยังไม่ได้สร้างตาราง → ดู log ขั้น Pre-deploy ของ api (ข้อ 5.5) ให้ผ่านก่อน |
+| `SEED_DEMO_PASSWORD: must be at least 12 characters` | รหัสสั้นเกินไป → รันบรรทัดที่ 2 และ 3 ใหม่ |
+| `Refusing to seed with NODE_ENV=production…` | บรรทัดที่ 3 ขาด `ALLOW_PRODUCTION_SEED=true` |
+| seed ผ่านแต่ login ไม่ได้ | รหัสผ่านคือค่าที่พิมพ์ในบรรทัดที่ 2 ตอน seed (ไม่ใช่ใน `apps/api/.env`) — จำไม่ได้ให้ seed ใหม่ด้วย ` -- --reset` |
 
 ### 5.7 ตรวจหลัง deploy (smoke test)
 
@@ -758,5 +820,5 @@ deploy แล้วพัง → service → แท็บ **Deployments** → �
 - [ ] URL ของ repo (private ให้เชิญผู้ประเมิน หรือเปิด public) — ไม่มี secret ในไฟล์และในประวัติ git
 - [ ] URL ของเว็บ `https://<web-domain>` + บัญชี demo (`sales01@demo.local` / `admin@demo.local`) + รหัสผ่านจากข้อ 5.6 (ส่งแยกจาก repo)
 - [ ] วิธีทดสอบ LINE: ภาพ QR code (ข้อ 6.3) + ขั้นตอนทักแล้วดูในระบบ — webhook ของ OA ตัวนี้ต้องชี้ production (ไม่ใช่ tunnel)
-- [ ] วิดีโอ 3–5 นาที (อัดเอง) — ลำดับแนะนำ: login → Leads / ค้นหา → lead + ย้าย stage → ขอคำแนะนำ AI + อนุมัติ (ข้อมูลเปลี่ยนหลังอนุมัติเท่านั้น) → ทักจากมือถือ → ข้อความ + ร่าง AI ขึ้น → อนุมัติ → ถึงมือถือ → restart service แล้วข้อมูลยังอยู่ → README / test / AI-usage log
+- [ ] วิดีโอ 3–5 นาที (อัดเอง) — ลำดับพร้อมเวลาและจุดที่ควรพูดอยู่ท้าย `docs/demo-guide.md` (คู่มือทดลองใช้ทุกกรณี)
 - [ ] ไม่มี secret จริงในเอกสาร วิดีโอ หรือแชต

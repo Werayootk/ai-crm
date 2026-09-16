@@ -438,6 +438,48 @@
 
 ---
 
+### #15 · 2026-09-14 17:46 — ข้อ 5.6 (seed บน Railway) ละเอียดขึ้น + คู่มือทดลองใช้ทุกกรณี
+
+**Prompt**
+
+> ตรง 5.6 ใส่ข้อมูล demo (ทำครั้งเดียว) ผมว่ายังไม่ละเอียดแบบทำตามได้รบกวน reveiw (17:46)
+>
+> deploy ขึ้นหมดแล้วขอ use case ทุกกรณีพร้อมวิธีการเล่นเว็บ รวมถึง ai และ line oa (18:11 — ขัดจังหวะงานข้อ 5.6)
+
+**สิ่งที่ AI ทำ**
+
+- review ข้อ 5.6 จากโค้ดจริง (`prisma db seed` → `seed.ts`: ค่าจาก shell ชนะ `.env`, ใส่ข้อมูลในทรานแซกชันเดียว, ตัวกัน production / ข้อมูลซ้ำ) และตรวจเมนู Railway จากเอกสาร (Settings → Networking → Public Access, ลบ TCP Proxy ด้วยไอคอนถังขยะ)
+- **ทดสอบกับฐานข้อมูลทดลองในเครื่อง** (`ai_crm_seedcheck` สร้างแล้วลบทิ้ง ไม่แตะ `ai_crm`): เก็บข้อความ error จริง 8 กรณี (ยังไม่มีตาราง, ลืม `ALLOW_PRODUCTION_SEED`, รหัสสั้น, คัดลอก URL ภายใน / แม่แบบ `${{…}}` / URL ขาด, รหัสฐานข้อมูลผิด, พอร์ตปิด = ข้อความว่าง), ลองขั้นตอนแบบ `read` ของ zsh ด้วยรหัสที่มี `'` `$` `!` แล้วตรวจ hash ว่า login ได้ (2 วินาที), ลอง `-- --reset`
+- **พบข้อความที่ทำให้หลง**: seed พิมพ์ "Password: the SEED_DEMO_PASSWORD value in apps/api/.env" ซึ่งผิดสำหรับ production → แก้เป็น "…value used for this run" แต่**ผู้ใช้ย้อนการแก้ใน `seed.ts` กลับ** (ไฟล์กลับเป็นข้อความเดิม) → คงโค้ดเดิมและอธิบายในคู่มือแทนว่ารหัสของ production คือค่าที่พิมพ์ตอนรัน
+- เขียนข้อ 5.6 ใหม่: เช็กลิสต์ก่อนเริ่ม → เปิดทางเข้า → คัดลอก URL พร้อมวิธีตรวจว่าถูกตัว → seed ด้วย `read` (ไม่ต้องแก้คำสั่ง, ค่าลับไม่เข้าประวัติคำสั่ง) → ผลที่ต้องเห็น → ตรวจ login ก่อนปิดทางเข้า → ปิดทางเข้า + ตาราง error 9 แถว
+- 18:11 เขียน `docs/demo-guide.md` (17 กรณี: CRM, stage, audit, ฟอร์มเว็บ, AI Copilot, guardrails, LINE OA, ส่งไม่สำเร็จ / ส่งซ้ำ, admin + ลำดับวิดีโอ 3–5 นาที) โดยคัดชื่อปุ่ม / ข้อความจากโค้ดหน้าเว็บ และ**เปิดแอปในเครื่องด้วย skill `run-ai-crm` ตรวจ 2 ข้อที่ไม่แน่ใจ**: ฟอร์มติดต่อเราที่ถามราคา + สั่งระบบ → AI ขึ้นคำเตือนครบ คะแนนไม่ทำตามคำสั่ง ความมั่นใจต่ำ และ lead ที่ไม่มี LINE ได้การ์ด 2 ใบ; อนุมัติแบบแก้คะแนน → timeline "คะแนน: — → 45 · กติกาสำรอง · แก้ไขก่อนอนุมัติ"
+- ระหว่างเขียนแก้ข้อความที่ไม่ถูกออกเอง: "ข้อความ LINE ที่เข้ามาระหว่าง restart ไม่หาย" (จริงเฉพาะ event ที่รับแล้ว — ตอน api ปิดอยู่ต้องพึ่ง webhook redelivery ของ LINE) และ "คะแนนไม่เป็น 100" (โค้ดบังคับแค่ความมั่นใจต่ำ — คะแนนกับ Claude ยังไม่ได้ลอง จึงอ้างผลกติกาสำรอง + เกณฑ์ eval แทน)
+- เพิ่มลิงก์ใน README (ตาราง Demo + ตารางเอกสาร), รายชื่อเอกสารใน `CLAUDE.md`, ชี้เช็กลิสต์วิดีโอใน setup-guide ไปที่คู่มือใหม่
+- ตรวจผลงานของ #14 ผ่าน GitHub API: CI ที่มีขั้น `next typegen` **ผ่านทั้งบน PR #2 และ push เข้า `main`** (รอบก่อนหน้าที่ไม่มีขั้นนี้ล้มที่ lint)
+
+**Human review** — งานของ #14 ผู้ใช้ commit เอง (`b036dbd`) และ merge เป็น PR #2 แล้ว; งานของ #15 ยังไม่ commit รอผู้ใช้ตรวจ
+
+---
+
+### #16 · 2026-09-16 10:19 — ตรวจโจทย์จาก assignment.pdf เทียบกับงานที่ทำ + commit เอกสารที่ค้าง
+
+**Prompt**
+
+> อ่าน docs/assignment.pdf ทีว่าตอนนี้ยังขาดอะไรอีกไหม
+
+**สิ่งที่ AI ทำ**
+
+- เครื่องไม่มี poppler / pypdf / Quartz จึงถอด PDF เอง: `qpdf --qdf --object-streams=disable` แล้วเขียนสคริปต์ python แยก content stream + ถอดรหัสด้วย ToUnicode CMap ของแต่ละฟอนต์ (bfchar / bfrange, Type0 = 2 ไบต์) — ได้ข้อความครบทั้ง 5 หน้า (หน้า 1–3 JD, หน้า 4–5 โจทย์)
+- เทียบข้อความจริงกับสรุปใน `CLAUDE.md` ส่วนที่ 1: **ตรงทุกข้อ ไม่มีข้อกำหนดที่ตกหล่นจากสรุป** (scenario 20 คน / 2,000 contacts / 300 active leads, เกณฑ์ 50/30/20, eval ≥ 5 เคส, timebox 5 วัน / 16 ชั่วโมง, ห้ามส่ง live secret)
+- ตรวจโค้ดจริงเทียบเกณฑ์ทั้ง 3 ส่วนด้วย subagent 3 ตัวขนานกัน (Part 1 / Part 2 / Part 3) — ผลคือ **ครบตามโจทย์ทุกข้อ**: Part 1 ได้ 8 model + CHECK constraint + seed ตรงสเกลโจทย์ + responsive จริง (การ์ดบนมือถือ / ตารางบน desktop) + timeline รวม activity กับ message; Part 2 ได้ SKILL.md ครบ 9 หัวข้อ + eval 7 เคสที่รันได้จริง + approval flow ที่แยก AI ออกจาก DB write + LINE ครบ signature / idempotency 3 ชั้น / retry backoff / mock adapter; Part 3 ได้ mermaid 2 diagram + test 199 เคสครบ 3 flow ที่โจทย์บังคับ + monitoring + log นี้
+- **พบปัญหาที่ผู้ประเมินจะเจอทันทีแต่ไม่เกี่ยวกับโค้ด**: branch `docs-demo-guide` ยัง 0 commits ahead ของ `origin/main` ทั้งที่มีงานค้างใน working tree — `docs/demo-guide.md` ยัง untracked (ไม่มีบน remote เลย) แต่ README ในเครื่องลิงก์ไปหา 2 จุด → คนที่ clone วันนี้ได้ลิงก์เสีย; และ Prisma CLI ทิ้ง agent-skill ไว้ 90 ไฟล์ใน `apps/api/.agents/` `.claude/` `.windsurf/` + `skills-lock.json` ที่จะหลุดเข้า repo ถ้า `git add -A`
+- แก้: เพิ่ม 4 บรรทัดใน `.gitignore` (ระบุ `apps/api/` นำหน้าทุกบรรทัด — `.claude/skills/run-ai-crm/` ที่ root ยัง track อยู่ 5 ไฟล์ ตรวจแล้วไม่โดน) แล้ว commit เอกสารที่ค้างทั้งชุด
+- **สิ่งที่เจอระหว่างตรวจแต่ผู้ใช้เลือกไม่แก้รอบนี้** (จดไว้เป็นข้อจำกัดที่รู้ตัว): (1) ข้อความ outbound สถานะ `QUEUED` ค้างถาวรได้ถ้า process ตายหลัง transaction commit แต่ก่อน `deliverMessage` — `retryMessage` รับเฉพาะ `FAILED` และ retry worker กวาดแค่ `WebhookEvent` ฝั่งขาเข้า ไม่มี sweeper ของขาออก; (2) คอมเมนต์ `promptVersion` ใน `schema.prisma` เขียนตัวอย่างเป็น `crm-copilot@1` แต่ของจริงคือ `@2`; (3) flag `NEGATIVE_SENTIMENT` ประกาศใน schema และแสดงบน UI แต่ไม่มี eval case ครอบ (ต่างจากอีก 4 flag)
+
+**Human review** — ผู้ใช้เลือกจาก 4 ตัวเลือกว่าให้ **commit เอกสารที่ค้างอย่างเดียว ไม่แก้โค้ด** (ไม่แตะบั๊ก `QUEUED` และ doc drift) — commit บน branch เดิม ไม่ push ตามกติกาใน `CLAUDE.md`
+
+---
+
 ## Review / Reject / การเปลี่ยนแปลงหลัง human inspection
 
 | วันเวลา | สิ่งที่ AI เสนอ | การตัดสินใจของคน | ผลที่เปลี่ยนไป |
@@ -448,3 +490,5 @@
 | 2026-09-14 15:28 | เอกสาร 3 ชั้น (README → deploy-railway → setup-guide) ลิงก์ข้ามไฟล์ 55 จุด | **ขอให้ลด** ก่อน commit | รวม `deploy-railway.md` เข้า README / setup-guide แล้วลบ, ลิงก์ข้ามไฟล์เหลือ 8 (ศูนย์รวมที่ README), เพิ่มกติกาการเขียนเอกสารใน `CLAUDE.md` |
 | 2026-09-14 16:02 | ปิด trigger ของ CI + เพิ่มขั้น `next typegen` (ต้นเหตุที่ CI ล้ม ทดสอบใน clone ใหม่แล้ว) | **ลบ `ci.yml` ทิ้งเอง** แล้ว merge PR #1 ก่อน จากนั้นขอสร้างใหม่ | CI กลับมาพร้อมขั้น typegen บน branch ใหม่; เพิ่มข้อควรรู้เรื่อง type ที่ generate ใน `CLAUDE.md` |
 | 2026-09-14 16:55 | setup-guide ข้อ 5.4 เขียนตามเอกสารว่า import แล้วได้ service เดียว | **ผู้ใช้ลองจริงแล้วเจอ** service ของ `@ai-crm/crm-copilot` บน Railway | แก้ข้อ 5.4–5.5: ลบ service ที่เป็น library, ล้าง Build / Start Command ที่ Railway ใส่ให้ (ทับ CMD ของ Dockerfile), Deploy ครั้งเดียว |
+| 2026-09-14 17:46 | setup-guide ข้อ 5.6 (seed บน Railway) แบบคำสั่งเดียวให้แก้ค่าเอง | **ผู้ใช้บอกว่ายังทำตามไม่ได้** | เขียนใหม่ทีละขั้นพร้อมวิธีตรวจ + ตาราง error จากการทดสอบจริง; การแก้ข้อความรหัสผ่านใน `seed.ts` ผู้ใช้ย้อนกลับ → อธิบายในคู่มือแทน |
+| 2026-09-16 10:19 | ตรวจ assignment.pdf เทียบโค้ด แล้วเสนอแก้ 3 อย่าง: commit เอกสารที่ค้าง / แก้บั๊ก `QUEUED` message ค้าง / แก้ doc drift เล็กๆ | **เลือกเฉพาะ commit เอกสาร** ไม่แก้โค้ด | commit `demo-guide.md` + README / setup-guide / CLAUDE.md / log ที่ค้าง และเพิ่ม `.gitignore` กัน agent-skill ของ Prisma CLI 90 ไฟล์; บั๊ก `QUEUED` ค้างและ flag `NEGATIVE_SENTIMENT` ที่ไม่มี eval ยังคงอยู่ — บันทึกไว้ใน #16 เป็นข้อจำกัดที่รู้ตัว |
